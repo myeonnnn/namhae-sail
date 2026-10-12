@@ -70,7 +70,12 @@ const seamarks = new Seamarks(scene, (x, z) => structures.topNear(x, z, 8) ?? te
 
 const chaseCamera = new ChaseCamera(camera, canvas, SHIP.camera);
 chaseCamera.alignTo(ship.state.heading);
-const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, wind, timeOfDay);
+const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, wind, timeOfDay, {
+  // 레이더의 전파를 반사하는 물체: 육지, 방파제와 부두, 다리의 상판과 교각
+  isSolid: (x, z) =>
+    terrain.isLand(x, z) || structures.contains(x, z) || bridges.hitsPier(x, z) || bridges.clearanceAt(x, z) !== undefined,
+  marks: () => seamarks.nearby(),
+});
 const alert = { message: '', at: -Infinity };
 
 // 운영 구역의 경계를 월드 좌표로 바꿔 둔다. 북쪽이 -Z이므로, 북쪽 끝의 z가 남쪽 끝의 z보다 작다.
@@ -286,11 +291,13 @@ startLoop({
     ocean.update(elapsed, focus.x, focus.z, camera, canvas.clientHeight, wind);
     impactSpray.update(frameTime);
     hud.update({
+      frameTime,
       camera,
       state: ship.state,
       controls: ship.controls,
       wind,
       engine: { rpm: ship.rpm, maxRpm: SHIP.engine.maxRpm },
+      shipLength: SHIP.model.length,
       alert,
       focus: observer.active ? observer : undefined,
     });

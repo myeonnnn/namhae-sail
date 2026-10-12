@@ -64,10 +64,24 @@ body {
   transform-origin: bottom center;
   display: flex;
   align-items: stretch;
+  /* 왼쪽 가장자리를 화면의 가운데에 놓고 절반만큼 되돌리는 방식이어서, 그대로 두면 폭이 화면의 절반으로 제한되고 계기가 서로 겹친다. */
+  width: max-content;
+}
+
+.hud-bottom > * {
+  flex-shrink: 0;
+}
+
+/* 여러 패널을 하나의 조작대처럼 보이도록, 패널 사이의 테두리와 안쪽 모서리의 둥글림을 없앤다. */
+.hud-bottom .hud-panel {
+  border-radius: 0;
+}
+
+.hud-bottom .hud-panel:not(:last-child) {
+  border-right: none;
 }
 
 .hud-bottom .hud-panel:first-child {
-  border-right: none;
   border-radius: 8px 0 0 8px;
 }
 
@@ -129,7 +143,7 @@ body {
   /* 높이는 계기판의 높이에 맞춘 값이며, 계기판의 구성을 바꾸면 함께 조정한다. */
   /* 폭은 아래에 표시하는 경위도의 글자 폭보다 넓게 잡아서, 지도의 옆에 빈 공간이 남지 않게 한다. */
   width: 196px;
-  height: 169px;
+  height: 205px;
   overflow: hidden;
   border-radius: 4px;
   background: #cfe4ee;
@@ -746,4 +760,46 @@ body {
 .hud-start-points span {
   color: var(--hud-text-muted);
   font-size: 11px;
+}
+
+/* 레이더 */
+
+.hud-radar-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+}
+
+.hud-radar-range {
+  margin-top: auto;
+  padding-top: 5px;
+  color: var(--hud-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.hud-radar {
+  position: relative;
+  width: 196px;
+  height: 196px;
+  margin-top: 4px;
+  border: 1px solid rgba(141, 255, 166, 0.35);
+  border-radius: 50%;
+  background: #04130d;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.hud-radar canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 화면의 오른쪽 위에 따로 둔 나침반 */
+
+.hud-compass-panel {
+  padding: 6px;
 }

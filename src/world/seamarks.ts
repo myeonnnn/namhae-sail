@@ -148,6 +148,11 @@ export class Seamarks {
     void this.load();
   }
 
+  /** 현재 화면에 그리고 있는 표지의 목록. 레이더가 주변의 표지를 표시하는 데 사용한다. */
+  nearby(): readonly Seamark[] {
+    return this.active;
+  }
+
   update(elapsed: number, focusX: number, focusZ: number): void {
     const now = performance.now();
     if (now - this.lastRefreshTime >= REFRESH_INTERVAL_MS) {

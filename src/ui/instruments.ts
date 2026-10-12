@@ -1,7 +1,5 @@
-import type * as THREE from 'three';
 import { windVelocity, type Wind } from '../environment/wind';
 import { apparentWind, type ShipControls, type ShipState } from '../ship/shipPhysics';
-import { Compass } from './compass';
 
 const MS_TO_KNOTS = 1.943844;
 const MAX_RUDDER_DEG = 35;
@@ -28,7 +26,6 @@ function tachArc(from: number, to: number): string {
 
 /** 조종하는 동안 계속 확인하는 값을 모은 계기판. 아래쪽에는 조종에 쓰는 기본 키만 표시하고, 전체 목록은 설정 메뉴에 둔다. */
 export class Instruments {
-  private readonly compass = new Compass();
   private readonly speed: HTMLElement;
   private readonly heading: HTMLElement;
   private readonly course: HTMLElement;
@@ -47,7 +44,6 @@ export class Instruments {
     // 모든 계기는 "이름표, 그 아래에 값"의 순서를 따른다. 그림이 있는 계기는 그림을 맨 위에 둔다.
     panel.innerHTML = `
       <div class="hud-gauges">
-        <div data-ref="compass"></div>
         <div class="hud-readouts">
           <div class="hud-label">속력</div>
           <div class="hud-speed"><span data-ref="speed"></span><small>kn</small></div>
@@ -118,13 +114,11 @@ export class Instruments {
     this.apparentValue = ref('apparent');
     this.throttleFill = panel.querySelector<HTMLElement>('.hud-throttle-fill')!;
     this.rudderFill = panel.querySelector<HTMLElement>('.hud-rudder-fill')!;
-    ref('compass').append(this.compass.element);
 
     root.append(panel);
   }
 
   update(
-    camera: THREE.Camera,
     state: ShipState,
     controls: ShipControls,
     wind: Wind,
@@ -179,7 +173,6 @@ export class Instruments {
         ? '없음'
         : `${side}${Math.abs(fromAngle).toFixed(0)}° · ${apparentSpeed.toFixed(1)} m/s`;
 
-    this.compass.update(camera, state, wind);
   }
 }
 
