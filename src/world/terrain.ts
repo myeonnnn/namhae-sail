@@ -80,11 +80,19 @@ export class Terrain {
    * 원본 표고가 아니라 화면에 그려진 메시의 높이를 읽으므로, 눈에 보이는 해안선과 판정이 일치한다.
    */
   isLand(x: number, z: number): boolean {
+    return (this.heightAt(x, z) ?? -1) > 0;
+  }
+
+  /**
+   * 월드의 (x, z) 지점에서 화면에 그려진 지형의 높이 (m). 수면이 0이다.
+   * 지형이 아직 불러와지지 않았거나 육지가 없는 타일이면 undefined를 반환한다.
+   */
+  heightAt(x: number, z: number): number | undefined {
     const tileCoord = worldToTile(x, z, TILE_ZOOM);
     const tx = Math.floor(tileCoord.x);
     const ty = Math.floor(tileCoord.y);
     const surface = this.tiles.get(`${tx}/${ty}`)?.surface;
-    if (!surface) return false;
+    if (!surface) return undefined;
 
     // 지점을 둘러싼 네 정점의 높이를 거리에 따라 섞는다(쌍선형 보간).
     const side = TERRAIN_SEGMENTS + 1;
@@ -97,7 +105,7 @@ export class Terrain {
     const index = row * side + column;
     const north = surface[index] * (1 - fx) + surface[index + 1] * fx;
     const south = surface[index + side] * (1 - fx) + surface[index + side + 1] * fx;
-    return north * (1 - fz) + south * fz > 0;
+    return north * (1 - fz) + south * fz;
   }
 
   private async loadTile(key: string, tile: TerrainTile, url: string): Promise<void> {

@@ -79,7 +79,7 @@ export const OCEAN_LINER: ShipSpec = {
     // 초속 15m의 옆바람에서 약 0.8m/s(1.5노트)로 밀리는 값이다.
     windSurge: 0.0006,
     windSway: 0.0028,
-    windYaw: 0.00001,
+    windYaw: 0.000004,
   },
   controls: {
     throttleRate: 0.8,
@@ -125,7 +125,7 @@ export const SPORT_YACHT: ShipSpec = {
     // 가벼운 선체는 바람의 영향을 크게 받는다. 초속 15m의 옆바람에서 약 1m/s로 밀린다.
     windSurge: 0.002,
     windSway: 0.011,
-    windYaw: 0.00024,
+    windYaw: 0.00003,
   },
   controls: {
     throttleRate: 0.8,

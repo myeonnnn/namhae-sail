@@ -11,6 +11,7 @@
 | 기능 | 설명 |
 |---|---|
 | **실제 지형** | 공개 표고 자료로 배 주변 14km의 지형을 실시간으로 불러와서 표시합니다. 부산에서 출발해서 남해의 어느 해역으로 이동해도 그 주변의 지형이 나타납니다. |
+| **등대와 부표** | OpenStreetMap에 등록된 남해의 등대, 등표, 부표 838개를 실제 위치에 3D로 표시합니다. 부표는 파도를 따라 움직이고, 등화는 자료에 기록된 색상과 주기로 깜빡입니다. |
 | **육지 충돌** | 선체가 화면에 보이는 해안선에 닿으면 멈추고, 좌초 경고를 표시합니다. |
 | **바람과 파도** | 풍속과 풍향을 조절하면 파도의 높이와 방향이 해양학의 스펙트럼 수식에 따라 변하고, 선체가 바람에 밀립니다. |
 | **부력** | 선체 아래의 수면을 읽어서 상하 움직임과 앞뒤, 좌우의 기울기를 계산합니다. 화면에 보이는 파도와 배가 타는 파도가 일치합니다. |
@@ -63,9 +64,9 @@ src/
   environment/  바람의 상태, 태양의 위치와 햇빛의 색상
   ocean/        파도의 목록과 수면 높이 계산, 수면의 셰이더, 항적
   ship/         선박의 사양, 운동 모델, 부력, 추적 카메라
-  world/        표고 타일의 해석, 지형 메시의 생성과 스트리밍
+  world/        표고 타일의 해석, 지형 메시의 생성과 스트리밍, 등대와 부표
   ui/           지도, 계기판, 나침반, 환경 패널, 설정 메뉴
-scripts/        요트 모델을 생성하는 스크립트
+scripts/        요트 모델을 생성하는 스크립트, 해상 표지 자료를 내려받는 스크립트
 ```
 
 한 프레임은 다음의 순서로 처리됩니다.
@@ -135,7 +136,8 @@ scripts/        요트 모델을 생성하는 스크립트
 | 자료 | 출처 | 라이선스 |
 |---|---|---|
 | 기본 지도 | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | ODbL |
-| 해상 표지 | [OpenSeaMap](https://www.openseamap.org/) | CC BY-SA |
+| 해상 표지 (지도) | [OpenSeaMap](https://www.openseamap.org/) | CC BY-SA |
+| 해상 표지 (3D) | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, Overpass API로 추출 | ODbL |
 | 표고 | [Mapzen Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data), 육지는 NASA SRTM 기반 | 구성 자료별 라이선스 |
 | 여객선 모델 | [Kenney Watercraft Kit](https://kenney.nl/) | CC0 |
 | 요트 모델 | `scripts/build-yacht.mjs`로 직접 생성 | 이 저장소와 동일 |
