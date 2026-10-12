@@ -18,11 +18,25 @@ export interface ChartStructure {
   points: [number, number][];
 }
 
+/** 바다를 건너는 다리. 여러 조각으로 등록된 다리를 하나로 이은 것이다. */
+export interface ChartBridge {
+  name?: string;
+  /** OpenStreetMap의 bridge:structure 값: cable-stayed(사장교), suspension(현수교), beam(거더교) 등 */
+  structure?: string;
+  /** 상판의 폭 (m). 차로의 수로 추정한 값이다. */
+  width: number;
+  /** 가장 높은 지점에서의 다리 밑 높이 (m). 자료에 없어서 다리의 형식으로 추정한 값이다. */
+  clearance: number;
+  length: number;
+  /** 중심선의 (경도, 위도) 목록 */
+  points: [number, number][];
+}
+
 /** scripts/fetch-chart.mjs가 저장하는 형식 */
 export interface ChartData {
   places: ChartPlace[];
   structures: ChartStructure[];
-  bridges: { name?: string; points: [number, number][] }[];
+  bridges: ChartBridge[];
   urban: [number, number][][];
 }
 

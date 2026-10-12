@@ -15,12 +15,14 @@ import { SPORT_YACHT } from './ship/shipSpec';
 import { createDevTools } from './ui/devTools';
 import { Hud } from './ui/hud';
 import { SeamarkInspector } from './ui/seamarkInspector';
+import { createStartPointList } from './ui/startPoints';
 import { StartScreen } from './ui/startScreen';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
 import region from './geo/region.json';
 import { loadChart } from './world/chartData';
 import { loadSeamarkRecords } from './world/seamarkData';
 import { Seamarks } from './world/seamarks';
+import { Bridges } from './world/bridges';
 import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
 
@@ -28,7 +30,8 @@ import { Terrain } from './world/terrain';
 // 조종할 선박. shipSpec.ts에 정의된 다른 선박으로 바꾸면 모델과 조종 특성, 카메라의 거리가 함께 바뀐다.
 const SHIP = SPORT_YACHT;
 
-const START = region.start;
+// region.json의 starts에 적힌 첫 번째 지점에서 시작한다. 나머지 지점은 설정 메뉴에서 골라서 이동할 수 있다.
+const START = region.starts[0];
 
 // 개발 도구(관찰 모드, 배의 순간 이동, 장소로 바로 이동, 주소로 시작 위치 지정)는 로컬의 개발 서버에서만 켠다.
 // Vite는 배포용으로 빌드할 때 import.meta.env.DEV를 false로 바꾸므로, 이 조건으로 감싼 코드는 결과물에서 제거된다.
@@ -61,6 +64,7 @@ scene.add(ship.object);
 
 const terrain = new Terrain(scene);
 const structures = new Structures(scene);
+const bridges = new Bridges(scene);
 // 등대와 등표는 방파제 위에 있으면 그 윗면에, 아니면 지형 위에 세운다.
 const seamarks = new Seamarks(scene, (x, z) => structures.topNear(x, z, 8) ?? terrain.heightAt(x, z));
 
@@ -116,18 +120,36 @@ function setObserver(active: boolean): void {
 function moveShipToObserver(): void {
   if (!observer.active) return;
   const { x, z } = observer;
-  if (isOutsideRegion(x, z) || terrain.isLand(x, z) || structures.contains(x, z)) {
+  if (isOutsideRegion(x, z) || terrain.isLand(x, z) || structures.contains(x, z) || bridges.hitsPier(x, z)) {
     alert.message = '이 위치로는 배를 옮길 수 없습니다 (육지, 구조물 또는 구역의 바깥)';
     alert.at = performance.now();
     return;
   }
-  Object.assign(ship.state, { x, z, surge: 0, sway: 0, yawRate: 0 });
+  placeShip(x, z, ship.state.heading);
+}
+
+/** 배를 지정한 위치에 정지한 상태로 놓는다. */
+function placeShip(x: number, z: number, heading: number): void {
+  Object.assign(ship.state, { x, z, heading, surge: 0, sway: 0, yawRate: 0 });
   ship.controls.throttle = 0;
+  ship.controls.rudder = 0;
   // 이전의 위치에서 새 위치까지 항적이 이어지지 않도록 기록을 지운다.
   wake.reset();
   hud.resetTrack();
   setObserver(false);
+  // 카메라가 이전의 방향에서 천천히 돌아오지 않고, 바로 선미 쪽에서 바라보게 한다.
+  chaseCamera.alignTo(heading);
+  chaseCamera.resetView();
 }
+
+hud.addSettingsSection(
+  '시작 위치',
+  createStartPointList(region.starts, (point) => {
+    const { x, z } = latLonToWorld(point);
+    placeShip(x, z, (point.headingDeg * Math.PI) / 180);
+    hud.closeSettings();
+  }),
+);
 
 if (DEV_TOOLS) {
   hud.addSettingsSection(
@@ -187,6 +209,28 @@ startLoop({
 
     if (ship.resolveGrounding((x, z) => terrain.isLand(x, z))) {
       alert.message = '좌초: 후진(S)으로 이탈';
+      alert.at = performance.now();
+      playImpact(impactSpeed, movingAhead);
+      return;
+    }
+
+    if (ship.resolveGrounding((x, z) => bridges.hitsPier(x, z))) {
+      alert.message = '교각과 충돌: 후진(S)으로 이탈';
+      alert.at = performance.now();
+      playImpact(impactSpeed, movingAhead);
+      return;
+    }
+
+    // 다리 밑의 높이가 선박보다 낮으면 지나갈 수 없다.
+    let blockedClearance: number | undefined;
+    const tooLow = (x: number, z: number) => {
+      const clearance = bridges.clearanceAt(x, z);
+      if (clearance === undefined || clearance >= SHIP.model.airDraft) return false;
+      blockedClearance = clearance;
+      return true;
+    };
+    if (ship.resolveGrounding(tooLow)) {
+      alert.message = `다리 밑을 지날 수 없습니다: 높이 ${blockedClearance!.toFixed(0)}m, 선박 ${SHIP.model.airDraft}m`;
       alert.at = performance.now();
       playImpact(impactSpeed, movingAhead);
       return;

@@ -95,6 +95,10 @@ export class Hud {
     this.settings.addSection(title, content);
   }
 
+  closeSettings(): void {
+    this.settings.close();
+  }
+
   /** 배를 다른 곳으로 옮겼을 때 지도의 항적을 지운다. */
   resetTrack(): void {
     this.minimap.resetTrack();

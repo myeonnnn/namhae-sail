@@ -81,7 +81,7 @@ const SHIP_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
 export class Minimap {
   private readonly position = document.createElement('div');
   private readonly view = new View({
-    center: fromLonLat([region.start.lon, region.start.lat]),
+    center: fromLonLat([region.starts[0].lon, region.starts[0].lat]),
     zoom: DEFAULT_ZOOM,
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
@@ -177,7 +177,7 @@ export class Minimap {
       layers: [
         land,
         new VectorLayer({ source: urban, style: new Style({ fill: new Fill({ color: '#dccba2' }) }) }),
-        // 방파제와 다리는 지도를 축소하면 점으로 뭉쳐서 보이므로, 한 픽셀이 60m보다 넓어지면 숨긴다.
+        // 방파제는 지도를 축소하면 점으로 뭉쳐서 보이므로, 한 픽셀이 60m보다 넓어지면 숨긴다.
         new VectorLayer({
           source: structures,
           maxResolution: 60,
@@ -185,7 +185,8 @@ export class Minimap {
         }),
         new VectorLayer({
           source: bridges,
-          maxResolution: 60,
+          // 바다를 건너는 다리만 남겼으므로, 넓게 볼 때에도 표시한다.
+          maxResolution: 200,
           style: new Style({ stroke: new Stroke({ color: '#8a5a44', width: 2 }) }),
         }),
         new VectorLayer({

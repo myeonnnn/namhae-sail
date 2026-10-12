@@ -724,3 +724,26 @@ body {
 .start-card button[hidden] {
   display: none;
 }
+
+/* 설정 메뉴의 시작 위치 목록 */
+
+.hud-start-points {
+  display: grid;
+  gap: 4px;
+}
+
+#hud .hud-start-points button {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.hud-start-points strong {
+  font-weight: 500;
+}
+
+.hud-start-points span {
+  color: var(--hud-text-muted);
+  font-size: 11px;
+}

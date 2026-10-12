@@ -72,6 +72,11 @@ export class SettingsMenu {
     this.dropdown.append(section);
   }
 
+  /** 메뉴를 닫는다. 메뉴 안의 항목을 골랐을 때, 화면을 가리지 않도록 호출한다. */
+  close(): void {
+    this.setOpen(false);
+  }
+
   private setOpen(open: boolean): void {
     this.dropdown.hidden = !open;
     this.button.setAttribute('aria-expanded', String(open));

@@ -10,6 +10,8 @@ export interface ShipSpec {
     beam: number;
     /** 물에 잠기는 깊이 (m). 원본 모델의 원점이 선체 바닥에 있으므로 이만큼 내려서 배치한다. */
     draft: number;
+    /** 수면에서 선박의 가장 높은 곳까지의 높이 (m). 다리 밑을 지날 수 있는지 판정하는 데 사용한다. */
+    airDraft: number;
     /** 원본 모델의 선수가 +Z를 향하면 true. 프로젝트의 규약인 -Z에 맞춰서 뒤집는다. */
     bowTowardPositiveZ: boolean;
   };
@@ -72,6 +74,7 @@ export const OCEAN_LINER: ShipSpec = {
     length: 180,
     beam: 40,
     draft: 8.5,
+    airDraft: 66,
     bowTowardPositiveZ: true,
   },
   physics: {
@@ -110,7 +113,9 @@ export const OCEAN_LINER: ShipSpec = {
 
 /**
  * 직접 제작한 15m급 스포츠 요트 모델. 원본이 미터 단위이고 선수가 -Z를 향하므로 변환 없이 사용한다.
- * 최고 속력은 약 32노트이고 5초 안에 도달하며, 전속에서의 선회 반경은 약 40m이다.
+ * 최고 속력은 바람이 없을 때 약 50노트이고 20노트까지 약 4초가 걸리며, 전속에서의 선회 반경은 약 70m이다.
+ * 고속에서는 공기의 저항이 커서, 맞바람에서는 최고 속력이 낮아지고 뒤바람에서는 높아진다.
+ * 실제 15m급 요트의 최고 속력은 30노트 안팎이지만, 넓은 구역을 오가기 편하도록 높였다.
  */
 export const SPORT_YACHT: ShipSpec = {
   model: {
@@ -120,15 +125,18 @@ export const SPORT_YACHT: ShipSpec = {
     beam: 4.3,
     // 선체 바닥의 방오 도료가 끝나는 높이를 수면으로 삼는다.
     draft: 0.8,
+    airDraft: 5.5,
     bowTowardPositiveZ: false,
   },
   physics: {
-    thrustAccel: 3.0,
-    reverseThrustRatio: 0.4,
+    thrustAccel: 4.5,
+    reverseThrustRatio: 0.3,
     surgeLinearDrag: 0.05,
-    surgeQuadraticDrag: 0.008,
+    // 공기의 저항(windSurge)이 고속에서 함께 작용하므로, 그만큼을 뺀 값이다.
+    surgeQuadraticDrag: 0.0029,
     swayDrag: 2.5,
-    rudderGain: 0.049,
+    // 타의 효과는 속력에 비례하므로, 최고 속력을 높인 만큼 계수를 낮춰서 전속에서의 선회가 지나치게 급해지지 않게 한다.
+    rudderGain: 0.036,
     propWashGain: 0.2,
     yawLinearDrag: 1.8,
     yawQuadraticDrag: 1.0,
