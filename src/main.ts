@@ -71,10 +71,14 @@ const seamarks = new Seamarks(scene, (x, z) => structures.topNear(x, z, 8) ?? te
 const chaseCamera = new ChaseCamera(camera, canvas, SHIP.camera);
 chaseCamera.alignTo(ship.state.heading);
 const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, wind, timeOfDay, {
-  // 레이더의 전파를 반사하는 물체: 육지, 방파제와 부두, 다리의 상판과 교각
+  // 레이더에 넓은 물체로 표시하는 것: 육지, 방파제와 부두, 그리고 선박이 지나갈 수 없을 만큼 낮은 다리.
+  // 아래로 지나갈 수 있는 다리의 상판은 장애물이 아니므로 표시하지 않고, 실제로 부딪히는 교각만 점으로 표시한다.
   isSolid: (x, z) =>
-    terrain.isLand(x, z) || structures.contains(x, z) || bridges.hitsPier(x, z) || bridges.clearanceAt(x, z) !== undefined,
-  marks: () => seamarks.nearby(),
+    terrain.isLand(x, z) || structures.contains(x, z) || (bridges.clearanceAt(x, z) ?? Infinity) < SHIP.model.airDraft,
+  *marks() {
+    yield* seamarks.nearby();
+    for (const pier of bridges.allPiers()) yield { x: pier.x, z: pier.z, structure: true };
+  },
 });
 const alert = { message: '', at: -Infinity };
 

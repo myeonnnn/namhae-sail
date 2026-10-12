@@ -2,10 +2,13 @@ import type { ShipState } from '../ship/shipPhysics';
 
 /** 레이더가 주변을 탐지하는 데 사용하는 정보 */
 export interface RadarProbe {
-  /** 월드의 (x, z) 지점이 전파를 반사하는 물체(육지, 방파제와 부두, 다리)이면 true */
+  /** 월드의 (x, z) 지점이 전파를 반사하는 넓은 물체(육지, 방파제와 부두, 지나갈 수 없는 낮은 다리)이면 true */
   isSolid(x: number, z: number): boolean;
-  /** 점으로 표시할 물체(등대, 등표, 부표)의 위치 */
-  marks(): Iterable<{ x: number; z: number }>;
+  /**
+   * 점으로 표시할 물체의 위치. 광선의 간격보다 작아서 넓은 물체처럼 탐지하면 놓치는 것들이다.
+   * structure가 true이면 교각과 같은 구조물이고, 아니면 등대, 등표, 부표와 같은 항로 표지이다.
+   */
+  marks(): Iterable<{ x: number; z: number; structure?: boolean }>;
 }
 
 const VIEW_SIZE = 196;
@@ -48,7 +51,7 @@ export class Radar {
   /** 안테나가 향하는 방향. 선수를 0으로 하는 시계 방향의 각도 (rad) */
   private sweep = 0;
   /** 탐지한 물체의 위치(월드 좌표)와 탐지한 시각 */
-  private detections: { x: number; z: number; time: number; mark: boolean }[] = [];
+  private detections: { x: number; z: number; time: number; mark: boolean; point: boolean }[] = [];
   private clock = 0;
   private wheelAccumulated = 0;
   private lastRangeChange = -Infinity;
@@ -109,7 +112,7 @@ export class Radar {
         const x = ship.x + sin * i * step;
         const z = ship.z - cos * i * step;
         if (this.probe.isSolid(x, z)) {
-          this.detections.push({ x, z, time: this.clock, mark: false });
+          this.detections.push({ x, z, time: this.clock, mark: false, point: false });
           if (++depth >= echoDepth) break;
         } else if (depth > 0) {
           break;
@@ -126,7 +129,7 @@ export class Radar {
       const bearing = normalize(Math.atan2(dx, -dz) - ship.heading);
       if (normalize(bearing - previous) >= advance) continue;
       if (this.isShadowed(ship, bearing, distance, step)) continue;
-      this.detections.push({ x: mark.x, z: mark.z, time: this.clock, mark: true });
+      this.detections.push({ x: mark.x, z: mark.z, time: this.clock, mark: !mark.structure, point: true });
     }
 
     this.drawDetections(ship, scale);
@@ -182,7 +185,8 @@ export class Radar {
       const starboard = dx * cos + dz * sin;
       if (Math.hypot(forward, starboard) * scale > RADIUS) continue;
 
-      const size = detection.mark ? 4 : 2.2;
+      // 점으로 탐지한 물체(항로 표지, 교각)는 해안선의 띠보다 크게 그려서 구분한다.
+      const size = detection.point ? 4 : 2.2;
       // 오래된 탐지일수록 흐리게 그려서, 주사선이 지나간 지 얼마나 되었는지를 나타낸다.
       echoes.globalAlpha = Math.max(0.25, Math.exp(-age / AFTERGLOW_SECONDS));
       echoes.fillStyle = detection.mark ? MARK_COLOUR : ECHO_COLOUR;

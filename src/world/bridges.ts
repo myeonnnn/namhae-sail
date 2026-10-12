@@ -49,11 +49,17 @@ interface Pier {
 export class Bridges {
   private readonly spans = new Map<string, Span[]>();
   private readonly piers = new Map<string, Pier[]>();
+  private readonly pierList: Pier[] = [];
 
   constructor(scene: THREE.Scene) {
     void loadChart()
       .then(({ bridges }) => this.build(scene, bridges))
       .catch((error) => console.warn('다리의 자료를 불러오지 못했습니다.', error));
+  }
+
+  /** 모든 교각과 주탑의 위치. 레이더가 교각을 점으로 표시하는 데 사용한다. */
+  allPiers(): readonly { x: number; z: number }[] {
+    return this.pierList;
   }
 
   /** 월드의 (x, z) 지점이 교각이나 주탑의 안쪽이면 true */
@@ -149,7 +155,9 @@ export class Bridges {
         }
 
         const radius = Math.max(bridge.width * 0.3, PIER_THICKNESS / 2) + (isTower ? 4 : 0);
-        this.register(this.piers, [station], { x: station.x, z: station.z, radius }, radius);
+        const entry = { x: station.x, z: station.z, radius };
+        this.pierList.push(entry);
+        this.register(this.piers, [station], entry, radius);
       }
     }
 
