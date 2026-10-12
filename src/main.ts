@@ -5,6 +5,7 @@ import { createStage } from './core/renderer';
 import { Ocean } from './ocean/ocean';
 import { ChaseCamera } from './ship/chaseCamera';
 import { Ship } from './ship/ship';
+import { OCEAN_LINER } from './ship/shipSpec';
 import { AxisGizmo } from './ui/axisGizmo';
 import { Hud } from './ui/hud';
 
@@ -13,10 +14,10 @@ const { renderer, scene, camera } = createStage(canvas);
 
 const input = new Input();
 const ocean = new Ocean(scene, renderer);
-const ship = new Ship();
+const ship = new Ship(OCEAN_LINER);
 scene.add(ship.object);
 
-const chaseCamera = new ChaseCamera(camera, canvas);
+const chaseCamera = new ChaseCamera(camera, canvas, OCEAN_LINER.camera);
 const hudRoot = document.querySelector<HTMLElement>('#hud')!;
 const hud = new Hud(hudRoot);
 const axisGizmo = new AxisGizmo(hudRoot);

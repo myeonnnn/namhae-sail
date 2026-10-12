@@ -6,7 +6,7 @@ import { createWaterNormals } from './waterNormals';
 const WATER_SIZE = 40000;
 const SUN_ELEVATION_DEG = 20;
 const SUN_AZIMUTH_DEG = 60;
-const WATER_PATTERN_SCALE = 2.5;
+const WATER_PATTERN_SCALE = 3.0;
 
 /** 수면, 하늘, 태양광을 묶어서 관리한다. 수면과 하늘은 카메라를 따라 이동하므로 끝이 보이지 않는다. */
 export class Ocean {

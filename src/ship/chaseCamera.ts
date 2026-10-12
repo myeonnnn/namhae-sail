@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import type { ShipState } from './shipPhysics';
+import type { ShipSpec } from './shipSpec';
 
 const FOLLOW_STIFFNESS = 2.5;
-const MIN_DISTANCE = 14;
-const MAX_DISTANCE = 160;
 const MIN_PITCH = 0.06;
 const MAX_PITCH = 1.3;
 
@@ -12,13 +11,16 @@ export class ChaseCamera {
   private followHeading = 0;
   private yawOffset = 0;
   private pitch = 0.28;
-  private distance = 36;
+  private distance: number;
   private readonly target = new THREE.Vector3();
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
     element: HTMLElement,
+    private readonly spec: ShipSpec['camera'],
   ) {
+    this.distance = spec.distance;
+
     element.addEventListener('pointerdown', (event) => element.setPointerCapture(event.pointerId));
     element.addEventListener('pointermove', (event) => {
       if (event.buttons === 0) return;
@@ -29,7 +31,7 @@ export class ChaseCamera {
       'wheel',
       (event) => {
         event.preventDefault();
-        this.distance = THREE.MathUtils.clamp(this.distance * Math.exp(event.deltaY * 0.001), MIN_DISTANCE, MAX_DISTANCE);
+        this.distance = THREE.MathUtils.clamp(this.distance * Math.exp(event.deltaY * 0.001), spec.minDistance, spec.maxDistance);
       },
       { passive: false },
     );
@@ -50,10 +52,10 @@ export class ChaseCamera {
     const viewHeading = this.followHeading + this.yawOffset;
     const horizontal = this.distance * Math.cos(this.pitch);
 
-    this.target.set(ship.x, 2.5, ship.z);
+    this.target.set(ship.x, this.spec.targetHeight, ship.z);
     this.camera.position.set(
       ship.x - Math.sin(viewHeading) * horizontal,
-      2.5 + this.distance * Math.sin(this.pitch),
+      this.spec.targetHeight + this.distance * Math.sin(this.pitch),
       ship.z + Math.cos(viewHeading) * horizontal,
     );
     this.camera.lookAt(this.target);

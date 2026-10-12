@@ -5,6 +5,8 @@
  * heading은 북쪽을 0으로 하고 시계 방향으로 증가하는 라디안 값이다.
  * 힘은 모두 질량으로 나눈 가속도 단위로 표현한다.
  */
+import type { ShipSpec } from './shipSpec';
+
 export interface ShipState {
   x: number;
   z: number;
@@ -24,24 +26,11 @@ export interface ShipControls {
   rudder: number;
 }
 
-export const SHIP_PARAMS = {
-  thrustAccel: 3.0,
-  reverseThrustRatio: 0.4,
-  surgeLinearDrag: 0.05,
-  surgeQuadraticDrag: 0.0167,
-  swayDrag: 3.0,
-  rudderGain: 0.044,
-  propWashGain: 0.15,
-  yawLinearDrag: 1.5,
-  yawQuadraticDrag: 1.0,
-} as const;
-
 export function createShipState(): ShipState {
   return { x: 0, z: 0, heading: 0, surge: 0, sway: 0, yawRate: 0 };
 }
 
-export function stepShip(state: ShipState, controls: ShipControls, dt: number): void {
-  const p = SHIP_PARAMS;
+export function stepShip(state: ShipState, controls: ShipControls, p: ShipSpec['physics'], dt: number): void {
   const { surge, sway, yawRate } = state;
 
   const thrust =
