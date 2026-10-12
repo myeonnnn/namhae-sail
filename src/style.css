@@ -55,3 +55,20 @@ body {
   line-height: 1.6;
   opacity: 0.85;
 }
+
+.hud-gizmo {
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud-gizmo-legend {
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.hud-gizmo-legend span {
+  font-weight: 700;
+}
