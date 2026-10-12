@@ -8,8 +8,12 @@ export interface Wind {
 
 export const MAX_WIND_SPEED = 20;
 
+/**
+ * 기본값은 15m급 요트가 운항하기에 적당한 날씨이다.
+ * 초속 6m는 흰 물거품이 드문드문 보이기 시작하는 바람이며, 유의파고는 약 0.5m이다.
+ */
 export function createWind(): Wind {
-  return { speed: 12, fromDeg: 225 };
+  return { speed: 6, fromDeg: 225 };
 }
 
 /** 바람이 공기를 이동시키는 속도를 월드 좌표로 반환한다. 풍향은 불어오는 쪽이므로 반대 방향을 향한다. */
