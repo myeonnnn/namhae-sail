@@ -28,9 +28,9 @@ startLoop({
   },
   render(frameTime, elapsed) {
     if (input.isDown('KeyC')) chaseCamera.resetView();
-    ship.syncObject(elapsed);
+    ship.syncObject(elapsed, frameTime);
     chaseCamera.update(frameTime, ship.state);
-    ocean.update(frameTime, camera);
+    ocean.update(elapsed, ship.state.x, ship.state.z, camera, canvas.clientHeight);
     hud.update(ship.state, ship.controls);
     axisGizmo.update(camera, ship.state);
     renderer.render(scene, camera);

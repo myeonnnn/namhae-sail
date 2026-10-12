@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { Water } from 'three/addons/objects/Water.js';
+import { createOceanGeometry, OCEAN_CELL_SIZE } from './oceanGeometry';
+import { createOceanMaterial } from './oceanMaterial';
 import { createWaterNormals } from './waterNormals';
 
-const WATER_SIZE = 40000;
 const SUN_ELEVATION_DEG = 20;
 const SUN_AZIMUTH_DEG = 60;
-const WATER_PATTERN_SCALE = 3.0;
+const SKY_CUBE_SIZE = 256;
 
-/** 수면, 하늘, 태양광을 묶어서 관리한다. 수면과 하늘은 카메라를 따라 이동하므로 끝이 보이지 않는다. */
+/** 수면, 하늘, 태양광을 묶어서 관리한다. 수면과 하늘은 배와 카메라를 따라 이동하므로 끝이 보이지 않는다. */
 export class Ocean {
   readonly sunDirection = new THREE.Vector3();
-  private readonly water: Water;
+  private readonly surface: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   private readonly sky = new Sky();
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -21,19 +21,6 @@ export class Ocean {
       THREE.MathUtils.degToRad(SUN_AZIMUTH_DEG),
     );
 
-    this.water = new Water(new THREE.PlaneGeometry(WATER_SIZE, WATER_SIZE), {
-      textureWidth: 512,
-      textureHeight: 512,
-      waterNormals: createWaterNormals(),
-      sunDirection: this.sunDirection,
-      sunColor: 0xffffff,
-      waterColor: 0x0b2b3c,
-      distortionScale: 3.7,
-    });
-    this.water.material.uniforms['size'].value = WATER_PATTERN_SCALE;
-    this.water.rotation.x = -Math.PI / 2;
-    scene.add(this.water);
-
     this.sky.scale.setScalar(10000);
     const skyUniforms = this.sky.material.uniforms;
     skyUniforms['turbidity'].value = 10;
@@ -41,25 +28,57 @@ export class Ocean {
     skyUniforms['mieCoefficient'].value = 0.005;
     skyUniforms['mieDirectionalG'].value = 0.8;
     skyUniforms['sunPosition'].value.copy(this.sunDirection);
-    scene.add(this.sky);
 
-    // 하늘을 환경 맵으로 변환해서 선체의 PBR 머티리얼이 하늘빛을 반사하도록 한다.
-    const pmrem = new THREE.PMREMGenerator(renderer);
+    // 하늘을 두 가지 형태로 미리 구워 둔다.
+    // 큐브 맵은 수면이 반사할 하늘로 사용하고, PMREM은 선체의 PBR 머티리얼이 받는 환경광으로 사용한다.
+    // 태양 원반은 지나치게 밝아서 반사에 얼룩을 만들기 때문에 굽는 동안에는 숨기고, 태양의 반사는 셰이더에서 따로 계산한다.
     const environmentScene = new THREE.Scene();
-    const environmentSky = this.sky.clone();
-    environmentScene.add(environmentSky);
+    environmentScene.add(this.sky);
+    skyUniforms['showSunDisc'].value = 0;
+
+    const skyCube = new THREE.WebGLCubeRenderTarget(SKY_CUBE_SIZE, {
+      type: THREE.HalfFloatType,
+      generateMipmaps: true,
+      minFilter: THREE.LinearMipmapLinearFilter,
+    });
+    new THREE.CubeCamera(1, 20000, skyCube).update(renderer, environmentScene);
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(environmentScene).texture;
     pmrem.dispose();
+
+    skyUniforms['showSunDisc'].value = 1;
+    scene.add(this.sky);
+
+    this.surface = new THREE.Mesh(
+      createOceanGeometry(),
+      createOceanMaterial({
+        sky: skyCube.texture,
+        detailNormals: createWaterNormals(),
+        sunDirection: this.sunDirection,
+      }),
+    );
+    // 정점을 셰이더에서 이동시키므로 Three.js가 계산한 경계 상자로는 화면 밖 여부를 판정할 수 없다.
+    this.surface.frustumCulled = false;
+    scene.add(this.surface);
 
     const sunLight = new THREE.DirectionalLight(0xfff1dc, 2.5);
     sunLight.position.copy(this.sunDirection).multiplyScalar(100);
     scene.add(sunLight);
   }
 
-  update(frameTime: number, camera: THREE.Camera): void {
-    this.water.material.uniforms['time'].value += frameTime * 0.6;
-    // 물결 무늬는 월드 좌표를 기준으로 샘플링되므로 평면을 옮겨도 무늬가 따라 움직이지 않는다.
-    this.water.position.set(camera.position.x, 0, camera.position.z);
+  /** elapsed는 부력 계산과 동일한 시계여야 화면의 파도와 배의 움직임이 일치한다. */
+  update(elapsed: number, focusX: number, focusZ: number, camera: THREE.PerspectiveCamera, viewportHeight: number): void {
+    const { uniforms } = this.surface.material;
+    uniforms['uTime'].value = elapsed;
+    uniforms['uPixelAngle'].value = THREE.MathUtils.degToRad(camera.fov) / viewportHeight;
+    // 파도는 월드 좌표를 기준으로 계산되므로 격자를 옮겨도 파도가 따라 움직이지 않는다.
+    // 다만 격자를 연속적으로 옮기면 정점이 파도를 읽는 위치가 매 프레임 달라져서 수면이 일렁이므로, 칸 단위로만 옮긴다.
+    this.surface.position.set(
+      Math.round(focusX / OCEAN_CELL_SIZE) * OCEAN_CELL_SIZE,
+      0,
+      Math.round(focusZ / OCEAN_CELL_SIZE) * OCEAN_CELL_SIZE,
+    );
     this.sky.position.copy(camera.position);
   }
 }

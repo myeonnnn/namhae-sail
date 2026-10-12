@@ -6,6 +6,8 @@ export interface ShipSpec {
     sourceLength: number;
     /** 월드에서의 길이 (m) */
     length: number;
+    /** 월드에서의 폭 (m). 부력을 계산할 때 수면을 읽는 범위로 사용한다. */
+    beam: number;
     /** 물에 잠기는 깊이 (m). 원본 모델의 원점이 선체 바닥에 있으므로 이만큼 내려서 배치한다. */
     draft: number;
     /** 원본 모델의 선수가 +Z를 향하면 true. 프로젝트의 규약인 -Z에 맞춰서 뒤집는다. */
@@ -31,12 +33,10 @@ export interface ShipSpec {
   motion: {
     /** 선회할 때의 기울기 계수. 양수이면 선회의 바깥쪽으로 기울어진다. */
     heelGain: number;
-    heaveAmplitude: number;
-    heavePeriod: number;
-    pitchAmplitude: number;
-    pitchPeriod: number;
-    rollAmplitude: number;
-    rollPeriod: number;
+    /** 선체가 수면의 변화를 따라가는 빠르기 (1/s). 값이 작을수록 무겁고 둔하게 움직인다. */
+    waveResponse: number;
+    /** 수면의 좌우 기울기 중에서 선체의 횡동요로 반영하는 비율 */
+    rollRatio: number;
   };
   camera: {
     distance: number;
@@ -56,6 +56,7 @@ export const OCEAN_LINER: ShipSpec = {
     url: '/models/kenney-watercraft/ship-ocean-liner.glb',
     sourceLength: 21.28,
     length: 180,
+    beam: 40,
     draft: 8.5,
     bowTowardPositiveZ: true,
   },
@@ -76,12 +77,8 @@ export const OCEAN_LINER: ShipSpec = {
   },
   motion: {
     heelGain: 0.15,
-    heaveAmplitude: 0.3,
-    heavePeriod: 11,
-    pitchAmplitude: 0.004,
-    pitchPeriod: 9,
-    rollAmplitude: 0.01,
-    rollPeriod: 14,
+    waveResponse: 1.2,
+    rollRatio: 0.6,
   },
   camera: {
     distance: 420,

@@ -1,16 +1,22 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Input } from '../core/input';
+import { sampleWaveHeight } from '../ocean/waves';
 import { createShipState, stepShip, type ShipControls, type ShipState } from './shipPhysics';
 import type { ShipSpec } from './shipSpec';
 
-const TWO_PI = Math.PI * 2;
+// 선체의 길이와 폭에 대한 비율로 표현한 수면의 측정 위치
+const HULL_SAMPLES_ALONG = [-0.42, -0.28, -0.14, 0, 0.14, 0.28, 0.42];
+const HULL_SAMPLES_ACROSS = [-0.35, 0, 0.35];
 
 export class Ship {
   readonly state: ShipState = createShipState();
   readonly controls: ShipControls = { throttle: 0, rudder: 0 };
   /** 선수가 -Z를 향하고 원점이 수면 높이에 놓이는 그룹. 모델은 비동기로 불러와서 이 안에 추가한다. */
   readonly object = new THREE.Group();
+  private heave = 0;
+  private pitch = 0;
+  private roll = 0;
 
   constructor(private readonly spec: ShipSpec) {
     this.object.rotation.order = 'YXZ';
@@ -35,17 +41,51 @@ export class Ship {
     stepShip(this.state, controls, spec.physics, dt);
   }
 
-  /** 물리 상태를 메시에 반영한다. 파도 변위는 아직 없으므로 흔들림은 연출용 근사값이다. */
-  syncObject(elapsed: number): void {
-    const { state, object } = this;
-    const m = this.spec.motion;
+  /**
+   * 물리 상태를 메시에 반영하고, 선체 아래의 수면을 읽어서 상하 움직임과 기울기를 계산한다.
+   * elapsed는 수면의 셰이더에 전달하는 시간과 동일해야 한다.
+   */
+  syncObject(elapsed: number, frameTime: number): void {
+    const { state, object, spec } = this;
+    const sin = Math.sin(state.heading);
+    const cos = Math.cos(state.heading);
 
-    object.position.set(state.x, Math.sin((elapsed / m.heavePeriod) * TWO_PI) * m.heaveAmplitude, state.z);
-    object.rotation.set(
-      Math.sin((elapsed / m.pitchPeriod) * TWO_PI) * m.pitchAmplitude,
-      -state.heading,
-      m.heelGain * state.yawRate * state.surge + Math.sin((elapsed / m.rollPeriod) * TWO_PI) * m.rollAmplitude,
-    );
+    // 선체의 수선면에 격자 모양으로 점을 찍고, 각 점에서 읽은 수면의 높이에 평면을 맞춘다.
+    // 평면의 평균 높이가 상하 움직임이 되고, 앞뒤 기울기와 좌우 기울기가 각각 종동요와 횡동요가 된다.
+    let heightSum = 0;
+    let alongMoment = 0;
+    let alongSquare = 0;
+    let acrossMoment = 0;
+    let acrossSquare = 0;
+    for (const along of HULL_SAMPLES_ALONG) {
+      for (const across of HULL_SAMPLES_ACROSS) {
+        const forward = along * spec.model.length;
+        const starboard = across * spec.model.beam;
+        const height = sampleWaveHeight(
+          state.x + forward * sin + starboard * cos,
+          state.z - forward * cos + starboard * sin,
+          elapsed,
+        );
+        heightSum += height;
+        alongMoment += forward * height;
+        alongSquare += forward * forward;
+        acrossMoment += starboard * height;
+        acrossSquare += starboard * starboard;
+      }
+    }
+    const sampleCount = HULL_SAMPLES_ALONG.length * HULL_SAMPLES_ACROSS.length;
+    const targetHeave = heightSum / sampleCount;
+    const targetPitch = Math.atan(alongMoment / alongSquare);
+    const targetRoll = Math.atan(acrossMoment / acrossSquare) * spec.motion.rollRatio;
+
+    // 무거운 선체는 수면의 변화를 즉시 따라가지 못하므로 지수 감쇠로 지연시킨다.
+    const blend = 1 - Math.exp(-spec.motion.waveResponse * frameTime);
+    this.heave += (targetHeave - this.heave) * blend;
+    this.pitch += (targetPitch - this.pitch) * blend;
+    this.roll += (targetRoll - this.roll) * blend;
+
+    object.position.set(state.x, this.heave, state.z);
+    object.rotation.set(this.pitch, -state.heading, this.roll + spec.motion.heelGain * state.yawRate * state.surge);
   }
 
   private async loadModel(): Promise<void> {
