@@ -5,6 +5,7 @@ import type { ShipSpec } from './shipSpec';
 const FOLLOW_STIFFNESS = 2.5;
 const MIN_PITCH = 0.06;
 const MAX_PITCH = 1.3;
+const SHAKE_DURATION = 0.6;
 
 /** 배의 뒤쪽을 따라가는 카메라. 드래그로 시점을 돌리고 휠로 거리를 조절한다. */
 export class ChaseCamera {
@@ -13,6 +14,8 @@ export class ChaseCamera {
   private pitch = 0.28;
   private distance: number;
   private readonly target = new THREE.Vector3();
+  private shakeStrength = 0;
+  private shakeRemaining = 0;
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
@@ -42,6 +45,12 @@ export class ChaseCamera {
     this.followHeading = heading;
   }
 
+  /** 충돌의 세기(0~1)에 비례해서 카메라를 잠시 흔든다. */
+  shake(intensity: number): void {
+    this.shakeStrength = Math.max(this.shakeStrength, THREE.MathUtils.clamp(intensity, 0, 1));
+    this.shakeRemaining = SHAKE_DURATION;
+  }
+
   resetView(): void {
     this.yawOffset = 0;
   }
@@ -63,6 +72,16 @@ export class ChaseCamera {
       this.spec.targetHeight + this.distance * Math.sin(this.pitch),
       ship.z + Math.cos(viewHeading) * horizontal,
     );
+
+    if (this.shakeRemaining > 0) {
+      this.shakeRemaining -= dt;
+      // 흔들림의 폭은 카메라와 배 사이의 거리에 비례해야 화면에서 같은 크기로 보인다. 시간이 지나면서 빠르게 잦아든다.
+      const amplitude = this.distance * 0.02 * this.shakeStrength * (Math.max(this.shakeRemaining, 0) / SHAKE_DURATION) ** 2;
+      this.camera.position.x += (Math.random() - 0.5) * amplitude;
+      this.camera.position.y += (Math.random() - 0.5) * amplitude;
+      this.camera.position.z += (Math.random() - 0.5) * amplitude;
+      if (this.shakeRemaining <= 0) this.shakeStrength = 0;
+    }
     this.camera.lookAt(this.target);
   }
 }

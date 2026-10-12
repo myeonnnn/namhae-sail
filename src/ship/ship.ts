@@ -23,6 +23,8 @@ export class Ship {
   readonly controls: ShipControls = { throttle: 0, rudder: 0 };
   /** 선수가 -Z를 향하고 원점이 수면 높이에 놓이는 그룹. 모델은 비동기로 불러와서 이 안에 추가한다. */
   readonly object = new THREE.Group();
+  /** 엔진의 회전수 (rpm). 스로틀을 조금 늦게 따라간다. */
+  rpm: number;
   private heave = 0;
   private previousX = 0;
   private previousZ = 0;
@@ -31,6 +33,7 @@ export class Ship {
   private roll = 0;
 
   constructor(private readonly spec: ShipSpec) {
+    this.rpm = spec.engine.idleRpm;
     this.object.rotation.order = 'YXZ';
     void this.loadModel();
   }
@@ -49,6 +52,11 @@ export class Ship {
 
     const rudderTarget = input.axis(['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']);
     controls.rudder = moveToward(controls.rudder, rudderTarget, spec.controls.rudderRate * dt);
+
+    // 전진과 후진 모두 스로틀을 올릴수록 회전수가 높아진다. 엔진은 레버를 움직여도 즉시 반응하지 않는다.
+    const { idleRpm, maxRpm, response } = spec.engine;
+    const targetRpm = idleRpm + Math.abs(controls.throttle) * (maxRpm - idleRpm);
+    this.rpm += (targetRpm - this.rpm) * (1 - Math.exp(-response * dt));
 
     this.previousX = this.state.x;
     this.previousZ = this.state.z;
@@ -70,14 +78,19 @@ export class Ship {
       return isLand(state.x + forward * sin + starboard * cos, state.z - forward * cos + starboard * sin);
     });
     if (!touching) return false;
+    this.stopAtPreviousPosition();
+    return true;
+  }
 
+  /** 직전 스텝의 위치로 되돌리고 멈춘다. 통과할 수 없는 물체에 닿았을 때 사용한다. */
+  stopAtPreviousPosition(): void {
+    const { state } = this;
     state.x = this.previousX;
     state.z = this.previousZ;
     state.heading = this.previousHeading;
     state.surge = 0;
     state.sway = 0;
     state.yawRate = 0;
-    return true;
   }
 
   /**

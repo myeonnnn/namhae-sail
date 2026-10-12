@@ -29,6 +29,14 @@ export interface ShipSpec {
     /** 옆바람이 선수를 바람이 불어 가는 쪽으로 돌리는 정도 */
     windYaw: number;
   };
+  engine: {
+    /** 스로틀이 중립일 때의 회전수 (rpm) */
+    idleRpm: number;
+    /** 스로틀을 끝까지 올렸을 때의 회전수 (rpm) */
+    maxRpm: number;
+    /** 회전수가 스로틀의 변화를 따라가는 빠르기 (1/s) */
+    response: number;
+  };
   controls: {
     /** 스로틀 레버가 초당 움직이는 양 */
     throttleRate: number;
@@ -81,6 +89,8 @@ export const OCEAN_LINER: ShipSpec = {
     windSway: 0.0028,
     windYaw: 0.000004,
   },
+  // 대형 선박의 저속 디젤 엔진은 프로펠러와 직결되어 있어서 회전수가 매우 낮다.
+  engine: { idleRpm: 30, maxRpm: 105, response: 0.5 },
   controls: {
     throttleRate: 0.8,
     rudderRate: 0.8,
@@ -127,6 +137,7 @@ export const SPORT_YACHT: ShipSpec = {
     windSway: 0.011,
     windYaw: 0.00003,
   },
+  engine: { idleRpm: 650, maxRpm: 3200, response: 1.6 },
   controls: {
     throttleRate: 0.8,
     rudderRate: 1.8,

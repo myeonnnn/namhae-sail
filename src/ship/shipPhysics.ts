@@ -39,13 +39,10 @@ export function stepShip(
   dt: number,
 ): void {
   const { surge, sway, yawRate } = state;
-  const headingSin = Math.sin(state.heading);
-  const headingCos = Math.cos(state.heading);
 
   // 선체가 실제로 받는 바람은 바람의 속도에서 배의 속도를 뺀 값이다.
   // 월드 기준의 바람을 선체 기준(선수 방향, 우현 방향)으로 변환한 다음에 배의 속도를 뺀다.
-  const apparentForward = wind.x * headingSin - wind.z * headingCos - surge;
-  const apparentStarboard = wind.x * headingCos + wind.z * headingSin - sway;
+  const { forward: apparentForward, starboard: apparentStarboard } = apparentWind(state, wind);
   // 풍압은 풍속의 제곱에 비례한다.
   const apparentSpeed = Math.hypot(apparentForward, apparentStarboard);
 
@@ -78,6 +75,20 @@ export function stepShip(
   const cos = Math.cos(state.heading);
   state.x += (state.surge * sin + state.sway * cos) * dt;
   state.z += (-state.surge * cos + state.sway * sin) * dt;
+}
+
+/**
+ * 선체가 실제로 받는 바람(겉보기 바람)을 선체 기준의 속도로 반환한다.
+ * 바람의 속도에서 배의 속도를 뺀 값이며, forward는 선수 방향으로, starboard는 우현 방향으로 공기가 이동하는 속도이다.
+ * 배가 빠르게 전진하면 바람이 없어도 앞에서 불어오는 바람을 받게 된다.
+ */
+export function apparentWind(state: ShipState, wind: { x: number; z: number }): { forward: number; starboard: number } {
+  const sin = Math.sin(state.heading);
+  const cos = Math.cos(state.heading);
+  return {
+    forward: wind.x * sin - wind.z * cos - state.surge,
+    starboard: wind.x * cos + wind.z * sin - state.sway,
+  };
 }
 
 /** 각도를 [0, 2π) 범위로 정규화한다. */

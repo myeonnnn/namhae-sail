@@ -59,7 +59,9 @@ body {
   position: absolute;
   bottom: var(--hud-margin);
   left: 50%;
-  transform: translateX(-50%);
+  /* 좁은 화면에서는 hud.ts가 --hud-console-scale을 1보다 작게 지정해서 조작대 전체를 줄인다. */
+  transform: translateX(-50%) scale(var(--hud-console-scale, 1));
+  transform-origin: bottom center;
   display: flex;
   align-items: stretch;
 }
@@ -122,8 +124,11 @@ body {
 
 /* 지도 */
 
-.hud-minimap {
+.hud-minimap-view {
   position: relative;
+}
+
+.hud-minimap {
   display: flex;
   flex-direction: column;
   padding: 6px;
@@ -135,25 +140,6 @@ body {
   border-radius: 4px;
 }
 
-.hud-minimap-zoom {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-#hud .hud-minimap-zoom button {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-color: rgba(27, 39, 51, 0.35);
-  background: rgba(255, 255, 255, 0.9);
-  color: #1b2733;
-  font: 700 15px/1 var(--hud-font-number);
-}
-
 .hud-minimap-position {
   margin-top: auto;
   padding-top: 5px;
@@ -163,11 +149,17 @@ body {
   white-space: pre;
 }
 
+/* 출처 표기는 지도의 아래쪽 모서리에 겹쳐서 표시한다. */
 .hud-minimap-attribution {
-  margin-top: 2px;
-  color: var(--hud-text-muted);
-  font-size: 9px;
-  text-align: center;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 3px 0 4px 0;
+  color: #1b2733;
+  font-size: 8px;
+  line-height: 13px;
 }
 
 /* 계기판 */
@@ -180,21 +172,49 @@ body {
 
 .hud-gauges {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 12px;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: end;
+  gap: 14px;
 }
 
-.hud-throttle {
+/* 그림 아래에 이름표와 값을 두는 계기. 회전계와 스로틀이 같은 줄에 맞춰서 정렬된다. */
+.hud-dial {
   display: grid;
   justify-items: center;
-  gap: 2px;
+  gap: 1px;
+  /* 값의 글자 수가 바뀌어도 계기판의 폭이 변하지 않도록 고정한다. */
+  min-width: 68px;
+  text-align: center;
+}
+
+.hud-dial svg {
+  display: block;
+}
+
+.hud-bearings {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.hud-bearings .hud-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 아래쪽 줄: 겉보기 바람과 타각을 나란히 둔다. */
+.hud-strip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 16px;
 }
 
 .hud-throttle-track {
   position: relative;
   width: 14px;
-  height: 78px;
+  height: 56px;
+  margin-bottom: 2px;
   background: var(--hud-track);
   border-radius: 4px;
 }
@@ -222,7 +242,7 @@ body {
 }
 
 .hud-speed {
-  font: 500 36px/1.1 var(--hud-font-number);
+  font: 500 34px/1.05 var(--hud-font-number);
   font-variant-numeric: tabular-nums;
 }
 
@@ -230,18 +250,6 @@ body {
   margin-left: 4px;
   color: var(--hud-text-muted);
   font-size: 12px;
-}
-
-.hud-bearing-values {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin-top: 4px;
-  text-align: center;
-}
-
-.hud-bearing-values .hud-value {
-  font-size: 14px;
-  font-weight: 500;
 }
 
 /* 나침반의 이동 방향 화살표와 같은 색상으로 표시해서, 같은 값이라는 것을 알린다. */
@@ -287,6 +295,52 @@ body {
 
 .hud-rudder-fill[data-side='port'] {
   background: var(--hud-port);
+}
+
+/* 회전계 */
+
+.hud-tach-track,
+.hud-tach-redline {
+  fill: none;
+  stroke: var(--hud-track);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.hud-tach-redline {
+  stroke: var(--hud-port);
+}
+
+.hud-tach-needle {
+  stroke: var(--hud-text);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.hud-tach-hub {
+  fill: var(--hud-text);
+}
+
+/* 겉보기 바람 */
+
+.hud-apparent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 168px;
+}
+
+.hud-apparent-ring {
+  fill: rgba(232, 241, 248, 0.06);
+  stroke: var(--hud-border);
+}
+
+.hud-apparent-hull {
+  fill: rgba(232, 241, 248, 0.28);
+}
+
+.hud-apparent-arrow {
+  fill: var(--hud-ahead);
 }
 
 /* 계기판 아래쪽의 기본 조작키 안내 */
@@ -449,4 +503,41 @@ body {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+}
+
+/* 해상 표지에 마우스를 올렸을 때의 표시 */
+
+.hud-seamark-ring {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--hud-text);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(8, 20, 34, 0.6);
+}
+
+.hud-seamark-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.hud-seamark-tooltip[data-placement='below'] {
+  transform: translate(-50%, 0);
+}
+
+.hud-seamark-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hud-seamark-range {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hud-border);
+}
+
+/* 속력의 자릿수가 바뀌어도 계기판의 폭이 변하지 않도록 고정한다. */
+.hud-readouts {
+  min-width: 150px;
 }

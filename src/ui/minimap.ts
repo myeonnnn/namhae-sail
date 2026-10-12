@@ -1,14 +1,24 @@
 import { latLonToTile, metersPerTilePixel, worldToLatLon } from '../geo/projection';
 import type { ShipState } from '../ship/shipPhysics';
 
-// 계기판의 높이에 맞춘 크기이다. 계기판의 구성을 바꾸면 함께 조정한다.
-const VIEW_SIZE = 177;
+// 높이는 계기판의 높이에 맞춘 값이며, 계기판의 구성을 바꾸면 함께 조정한다.
+// 폭은 아래에 표시하는 경위도의 글자 폭보다 넓게 잡아서, 지도의 옆에 빈 공간이 남지 않게 한다.
+const VIEW_WIDTH = 196;
+const VIEW_HEIGHT = 169;
 const TILE_SIZE = 256;
 const MIN_ZOOM = 7;
 const MAX_ZOOM = 16;
 const DEFAULT_ZOOM = 10;
 const REDRAW_INTERVAL_MS = 100;
 const MAX_CACHED_TILES = 300;
+// 줌을 한 단계 바꾸는 데 필요한 스크롤의 양. 마우스 휠의 한 칸이 대략 100이다.
+const WHEEL_STEP = 100;
+// 이어지는 스크롤에서 줌을 바꾼 뒤에 다음 단계를 허용하기까지의 간격
+const ZOOM_COOLDOWN_MS = 500;
+// 스크롤 이벤트 사이의 멈춤이 이보다 길면 마우스 휠의 새로운 한 칸으로 본다.
+const WHEEL_NOTCH_PAUSE_MS = 120;
+// 스크롤이 이 시간 동안 멈추면 모아 둔 양을 버린다.
+const WHEEL_IDLE_RESET_MS = 300;
 const SEA_COLOR = '#aad3df';
 
 /** 아래에서 위의 순서로 겹쳐서 그리는 타일 레이어 */
@@ -30,39 +40,58 @@ export class Minimap {
   private readonly position = document.createElement('div');
   private zoom = DEFAULT_ZOOM;
   private lastDrawTime = -Infinity;
+  private wheelAccumulated = 0;
+  private lastWheelTime = -Infinity;
+  private lastZoomTime = -Infinity;
 
   constructor(root: HTMLElement) {
     const panel = document.createElement('div');
     panel.className = 'hud-panel hud-minimap';
 
     const pixelRatio = Math.min(window.devicePixelRatio, 2);
-    this.canvas.width = VIEW_SIZE * pixelRatio;
-    this.canvas.height = VIEW_SIZE * pixelRatio;
-    this.canvas.style.width = `${VIEW_SIZE}px`;
-    this.canvas.style.height = `${VIEW_SIZE}px`;
+    this.canvas.width = VIEW_WIDTH * pixelRatio;
+    this.canvas.height = VIEW_HEIGHT * pixelRatio;
+    this.canvas.style.width = `${VIEW_WIDTH}px`;
+    this.canvas.style.height = `${VIEW_HEIGHT}px`;
     this.context = this.canvas.getContext('2d')!;
     this.context.scale(pixelRatio, pixelRatio);
+    this.canvas.dataset['zoom'] = String(this.zoom);
 
     this.canvas.addEventListener(
       'wheel',
       (event) => {
         event.preventDefault();
-        this.setZoom(this.zoom - Math.sign(event.deltaY));
+        // 트랙패드는 한 번의 손동작에 수십 개의 작은 이벤트를 보낸다.
+        // 이벤트마다 줌을 바꾸면 한꺼번에 여러 단계가 넘어가므로, 스크롤한 양을 모아서 일정량이 될 때마다 한 단계만 바꾼다.
+        const now = performance.now();
+        const pause = now - this.lastWheelTime;
+        if (pause > WHEEL_IDLE_RESET_MS) this.wheelAccumulated = 0;
+        this.lastWheelTime = now;
+        this.wheelAccumulated += event.deltaY;
+        if (Math.abs(this.wheelAccumulated) < WHEEL_STEP) return;
+        // 끊기지 않고 이어지는 스크롤(트랙패드의 관성 포함)에서는 일정한 간격으로만 다음 단계를 허용한다.
+        // 마우스 휠처럼 칸마다 멈춤이 있는 입력은 칸마다 한 단계씩 바로 반응한다.
+        if (pause < WHEEL_NOTCH_PAUSE_MS && now - this.lastZoomTime < ZOOM_COOLDOWN_MS) return;
+
+        this.setZoom(this.zoom - Math.sign(this.wheelAccumulated));
+        this.wheelAccumulated = 0;
+        this.lastZoomTime = now;
       },
       { passive: false },
     );
 
-    const controls = document.createElement('div');
-    controls.className = 'hud-minimap-zoom';
-    controls.append(this.createZoomButton('+', 1), this.createZoomButton('−', -1));
-
     const attribution = document.createElement('div');
     attribution.className = 'hud-minimap-attribution';
-    attribution.innerHTML = '© OpenStreetMap contributors<br />OpenSeaMap · 표고: Mapzen, SRTM';
+    attribution.textContent = '© OpenStreetMap · OpenSeaMap';
 
     this.position.className = 'hud-minimap-position';
 
-    panel.append(this.canvas, controls, this.position, attribution);
+    // 출처 표기는 지도의 영역 위에 겹쳐서 놓는다.
+    const view = document.createElement('div');
+    view.className = 'hud-minimap-view';
+    view.append(this.canvas, attribution);
+
+    panel.append(view, this.position);
     root.append(panel);
   }
 
@@ -76,16 +105,16 @@ export class Minimap {
     this.position.textContent = `${formatAngle(position.lat, 'N', 'S')}  ${formatAngle(position.lon, 'E', 'W')}`;
     const center = latLonToTile(position, zoom);
     // 화면의 왼쪽 위 모서리가 전 세계를 하나의 이미지로 펼친 좌표에서 어디인지 계산한다.
-    const left = center.x * TILE_SIZE - VIEW_SIZE / 2;
-    const top = center.y * TILE_SIZE - VIEW_SIZE / 2;
+    const left = center.x * TILE_SIZE - VIEW_WIDTH / 2;
+    const top = center.y * TILE_SIZE - VIEW_HEIGHT / 2;
     const tileCount = 2 ** zoom;
 
     context.fillStyle = SEA_COLOR;
-    context.fillRect(0, 0, VIEW_SIZE, VIEW_SIZE);
+    context.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     for (const layer of LAYERS) {
-      for (let ty = Math.floor(top / TILE_SIZE); ty * TILE_SIZE < top + VIEW_SIZE; ty++) {
-        for (let tx = Math.floor(left / TILE_SIZE); tx * TILE_SIZE < left + VIEW_SIZE; tx++) {
+      for (let ty = Math.floor(top / TILE_SIZE); ty * TILE_SIZE < top + VIEW_HEIGHT; ty++) {
+        for (let tx = Math.floor(left / TILE_SIZE); tx * TILE_SIZE < left + VIEW_WIDTH; tx++) {
           if (tx < 0 || ty < 0 || tx >= tileCount || ty >= tileCount) continue;
           const image = this.getTile(`${layer.name}/${zoom}/${tx}/${ty}`, layer.url(zoom, tx, ty));
           if (!image.complete || image.naturalWidth === 0) continue;
@@ -100,20 +129,8 @@ export class Minimap {
 
   private setZoom(zoom: number): void {
     this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+    this.canvas.dataset['zoom'] = String(this.zoom);
     this.lastDrawTime = -Infinity;
-  }
-
-  private createZoomButton(label: string, delta: number): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = label;
-    button.tabIndex = -1;
-    button.addEventListener('click', () => {
-      this.setZoom(this.zoom + delta);
-      // 버튼에 포커스가 남아 있으면 스로틀 중립 키인 Space가 버튼을 누르게 된다.
-      button.blur();
-    });
-    return button;
   }
 
   private getTile(key: string, url: string): HTMLImageElement {
@@ -132,7 +149,7 @@ export class Minimap {
   private drawShip(heading: number): void {
     const { context } = this;
     context.save();
-    context.translate(VIEW_SIZE / 2, VIEW_SIZE / 2);
+    context.translate(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
     context.rotate(heading);
     context.beginPath();
     context.moveTo(0, -11);
@@ -157,7 +174,7 @@ export class Minimap {
     const meters = [5, 2, 1].map((step) => step * magnitude).find((value) => value <= maxMeters)!;
     const width = meters / metersPerPixel;
     const x = 10;
-    const y = VIEW_SIZE - 12;
+    const y = VIEW_HEIGHT - 12;
 
     context.fillStyle = 'rgba(255, 255, 255, 0.8)';
     context.fillRect(x - 4, y - 16, width + 8, 22);

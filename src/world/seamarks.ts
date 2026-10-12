@@ -3,10 +3,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { latLonToWorld } from '../geo/projection';
 import { sampleWaveHeight } from '../ocean/waves';
 
-type SeamarkKind = 'light' | 'beacon' | 'buoy';
+export type SeamarkKind = 'light' | 'beacon' | 'buoy';
 
 /** scripts/fetch-seamarks.mjs가 저장하는 형식 */
-interface SeamarkRecord {
+export interface SeamarkRecord {
   kind: SeamarkKind;
   lat: number;
   lon: number;
@@ -21,9 +21,16 @@ interface SeamarkRecord {
   name?: string;
 }
 
-interface Seamark extends SeamarkRecord {
+export interface Seamark extends SeamarkRecord {
   x: number;
   z: number;
+  /** 마지막으로 그렸을 때의 바닥 높이와 크기의 배율. 화면에서 표지를 선택할 때 사용한다. */
+  baseY: number;
+  size: number;
+  /** 부표가 배에 부딪힌 시각과 밀린 방향. 부딪힌 뒤에 한동안 기울어져서 흔들리는 연출에 사용한다. */
+  hitTime: number;
+  hitDirX: number;
+  hitDirZ: number;
   /** 등화가 서로 동시에 깜빡이지 않도록 표지마다 다르게 주는 시간의 어긋남 (초) */
   phase: number;
 }
@@ -43,6 +50,9 @@ const FLASH_DURATION = 1;
 const DEFAULT_LIGHT_ELEVATION = 14;
 const MIN_TOWER_HEIGHT = 7;
 const MAX_TOWER_HEIGHT = 30;
+// 부딪힌 부표가 흔들리는 시간 (초)
+const BUOY_SWAY_DURATION = 6;
+const UP = new THREE.Vector3(0, 1, 0);
 
 const COLOURS: Record<string, number> = {
   red: 0xc5242c,
@@ -83,11 +93,30 @@ function createBuoyGeometry(): THREE.BufferGeometry {
   return mergeGeometries([body, tower])!;
 }
 
-const KINDS: Record<SeamarkKind, { geometry: () => THREE.BufferGeometry; lampHeight: number; lampRadius: number }> = {
-  light: { geometry: createLighthouseGeometry, lampHeight: 0.89, lampRadius: 0.07 },
-  beacon: { geometry: createBeaconGeometry, lampHeight: 9, lampRadius: 0.55 },
-  buoy: { geometry: createBuoyGeometry, lampHeight: 4.1, lampRadius: 0.45 },
+const KINDS: Record<
+  SeamarkKind,
+  {
+    geometry: () => THREE.BufferGeometry;
+    lampHeight: number;
+    lampRadius: number;
+    topHeight: number;
+    /** 충돌을 판정할 때 표지를 원으로 취급하는 반지름. 등대는 크기의 배율을 곱해서 사용한다. */
+    radius: number;
+  }
+> = {
+  light: { geometry: createLighthouseGeometry, lampHeight: 0.89, lampRadius: 0.07, topHeight: 1, radius: 0.16 },
+  beacon: { geometry: createBeaconGeometry, lampHeight: 9, lampRadius: 0.55, topHeight: 9.2, radius: 1.8 },
+  buoy: { geometry: createBuoyGeometry, lampHeight: 4.1, lampRadius: 0.45, topHeight: 4.3, radius: 1.2 },
 };
+
+/** 화면에서 선택된 표지와, 그 표지의 바닥과 꼭대기가 화면에 놓인 위치 (픽셀) */
+export interface SeamarkHit {
+  mark: Seamark;
+  baseX: number;
+  baseY: number;
+  topX: number;
+  topY: number;
+}
 
 /**
  * 등대, 등표, 부표를 3D로 표시한다.
@@ -103,6 +132,7 @@ export class Seamarks {
   private readonly position = new THREE.Vector3();
   private readonly scale = new THREE.Vector3();
   private readonly quaternion = new THREE.Quaternion();
+  private readonly axis = new THREE.Vector3();
   private readonly colour = new THREE.Color();
 
   constructor(
@@ -166,6 +196,19 @@ export class Seamarks {
         }
       }
 
+      mark.baseY = baseY;
+      mark.size = size;
+
+      // 배에 부딪힌 부표는 밀린 방향으로 기울어졌다가, 흔들리면서 서서히 바로 선다.
+      const sinceHit = elapsed - mark.hitTime;
+      if (mark.kind === 'buoy' && sinceHit < BUOY_SWAY_DURATION) {
+        const tilt = 0.7 * Math.exp(-1.1 * sinceHit) * Math.cos(4.5 * sinceHit);
+        // 위쪽 축과 밀린 방향에 모두 수직인 축을 중심으로 돌리면, 꼭대기가 밀린 방향으로 넘어간다.
+        this.quaternion.setFromAxisAngle(this.axis.set(mark.hitDirZ, 0, -mark.hitDirX), tilt);
+      } else {
+        this.quaternion.identity();
+      }
+
       const body = this.bodies[mark.kind];
       this.position.set(mark.x, baseY, mark.z);
       this.matrix.compose(this.position, this.quaternion, this.scale.setScalar(size));
@@ -173,7 +216,10 @@ export class Seamarks {
       body.setColorAt(index, this.colour.setHex(bodyColour(mark)));
 
       if (mark.light && isLampOn(mark, elapsed)) {
-        this.position.y = baseY + lampHeight * size;
+        this.position.copy(UP).multiplyScalar(lampHeight * size).applyQuaternion(this.quaternion);
+        this.position.x += mark.x;
+        this.position.y += baseY;
+        this.position.z += mark.z;
         this.matrix.compose(this.position, this.quaternion, this.scale.setScalar(lampRadius * size * 1.6));
         this.lamps.setMatrixAt(lampCount, this.matrix);
         this.lamps.setColorAt(lampCount, this.colour.setHex(LAMP_COLOURS[mark.light] ?? LAMP_COLOURS['white']));
@@ -183,6 +229,80 @@ export class Seamarks {
 
     for (const kind of Object.keys(this.bodies) as SeamarkKind[]) this.commit(this.bodies[kind], counts[kind]);
     this.commit(this.lamps, lampCount);
+  }
+
+  /**
+   * 선체와 겹친 표지를 찾는다. 선체는 길이와 폭을 가진 직사각형으로, 표지는 원으로 취급한다.
+   * 부표는 부딪힌 순간에만 한 번 반환하고, 밀린 방향을 기록해서 기울어지는 연출을 시작한다.
+   */
+  collide(
+    shipX: number,
+    shipZ: number,
+    heading: number,
+    halfLength: number,
+    halfBeam: number,
+    elapsed: number,
+  ): Seamark | null {
+    const sin = Math.sin(heading);
+    const cos = Math.cos(heading);
+    for (const mark of this.active) {
+      // 표지의 위치를 선체 기준의 좌표(선수 방향, 우현 방향)로 변환해서 직사각형과 비교한다.
+      const dx = mark.x - shipX;
+      const dz = mark.z - shipZ;
+      const forward = dx * sin - dz * cos;
+      const starboard = dx * cos + dz * sin;
+      const radius = KINDS[mark.kind].radius * mark.size;
+      if (Math.abs(forward) > halfLength + radius || Math.abs(starboard) > halfBeam + radius) continue;
+
+      if (mark.kind === 'buoy') {
+        // 선체가 부표 위를 지나가는 동안 매 스텝마다 다시 부딪힌 것으로 처리하지 않도록 한다.
+        if (elapsed - mark.hitTime < 2) continue;
+        const length = Math.hypot(dx, dz) || 1;
+        mark.hitTime = elapsed;
+        mark.hitDirX = dx / length;
+        mark.hitDirZ = dz / length;
+      }
+      return mark;
+    }
+    return null;
+  }
+
+  /**
+   * 화면의 한 지점에서 가장 가까운 표지를 찾는다. maxPixels보다 멀리 떨어진 표지만 있으면 null을 반환한다.
+   *
+   * 3D 형태에 광선을 쏘아서 판정하지 않고, 표지가 화면에 놓인 위치와의 거리로 판정한다.
+   * 멀리 있는 부표는 화면에서 몇 픽셀에 불과해서, 형태를 정확하게 가리키는 방식으로는 선택하기 어렵기 때문이다.
+   */
+  pick(
+    camera: THREE.Camera,
+    pointerX: number,
+    pointerY: number,
+    width: number,
+    height: number,
+    maxPixels: number,
+  ): SeamarkHit | null {
+    let best: SeamarkHit | null = null;
+    let bestDistance = maxPixels;
+
+    for (const mark of this.active) {
+      const topWorldY = mark.baseY + KINDS[mark.kind].topHeight * mark.size;
+      // project는 월드 좌표를 화면의 정규화된 좌표(-1~1)로 변환한다. z가 이 범위를 벗어나면 카메라의 뒤쪽이거나 너무 먼 곳이다.
+      this.position.set(mark.x, mark.baseY, mark.z).project(camera);
+      if (this.position.z < -1 || this.position.z > 1) continue;
+      const baseX = (this.position.x * 0.5 + 0.5) * width;
+      const baseY = (-this.position.y * 0.5 + 0.5) * height;
+      this.position.set(mark.x, topWorldY, mark.z).project(camera);
+      const topX = (this.position.x * 0.5 + 0.5) * width;
+      const topY = (-this.position.y * 0.5 + 0.5) * height;
+
+      // 가까이 있는 등대는 화면에서 길게 보이므로, 한 점이 아니라 바닥과 꼭대기를 잇는 선분까지의 거리를 잰다.
+      const distance = distanceToSegment(pointerX, pointerY, baseX, baseY, topX, topY);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = { mark, baseX, baseY, topX, topY };
+      }
+    }
+    return best;
   }
 
   private commit(mesh: THREE.InstancedMesh, count: number): void {
@@ -199,7 +319,17 @@ export class Seamarks {
       records.forEach((record, index) => {
         const { x, z } = latLonToWorld(record);
         // 황금비를 이용해서 표지마다 고르게 흩어진 어긋남을 준다.
-        const mark: Seamark = { ...record, x, z, phase: (index * 0.618034 * 10) % 10 };
+        const mark: Seamark = {
+          ...record,
+          x,
+          z,
+          baseY: 0,
+          size: 1,
+          hitTime: -Infinity,
+          hitDirX: 0,
+          hitDirZ: 0,
+          phase: (index * 0.618034 * 10) % 10,
+        };
         const key = cellKey(x, z);
         const cell = this.cells.get(key);
         if (cell) cell.push(mark);
@@ -243,4 +373,12 @@ function bodyColour(mark: Seamark): number {
 function isLampOn(mark: Seamark, elapsed: number): boolean {
   const period = mark.period ?? DEFAULT_PERIOD;
   return (elapsed + mark.phase) % period < Math.min(FLASH_DURATION, period * 0.3);
+}
+
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared > 0 ? THREE.MathUtils.clamp(((px - ax) * dx + (py - ay) * dy) / lengthSquared, 0, 1) : 0;
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
 }
