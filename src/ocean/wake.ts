@@ -2,11 +2,9 @@ import * as THREE from 'three';
 import type { ShipState } from '../ship/shipPhysics';
 
 const MAP_SIZE = 2048;
-/** 항적 지도가 덮는 범위의 절반 (m). 배를 중심으로 한 정사각형이다. */
-const MAP_HALF_EXTENT = 1600;
-const POINT_SPACING = 8;
 const MAX_POINTS = 200;
-const MAX_AGE = 120;
+// 아래의 수치는 길이 180m, 폭 40m의 선박을 기준으로 정한 값이며, 실제 선체의 크기에 비례해서 조정한다.
+const REFERENCE_LENGTH = 180;
 // 항적이 생기기 시작하는 속력과 가장 짙어지는 속력 (m/s)
 const MIN_WAKE_SPEED = 0.5;
 const FULL_WAKE_SPEED = 7;
@@ -55,7 +53,12 @@ export class Wake {
   readonly texture: THREE.Texture;
   /** 지도의 중심에 해당하는 월드의 (x, z) */
   readonly center = new THREE.Vector2();
-  readonly halfExtent = MAP_HALF_EXTENT;
+  /** 항적 지도가 덮는 범위의 절반 (m). 배를 중심으로 한 정사각형이며, 작은 배일수록 좁게 잡아서 해상도를 확보한다. */
+  readonly halfExtent: number;
+  /** 이동 경로를 기록하는 간격 (m) */
+  private readonly pointSpacing: number;
+  /** 선미의 물거품이 약 37%로 옅어지는 데 걸리는 시간 (초). 큰 배의 항적일수록 오래 남는다. */
+  private readonly wakeLife: number;
 
   private readonly target = new THREE.WebGLRenderTarget(MAP_SIZE, MAP_SIZE, { depthBuffer: false });
   private readonly scene = new THREE.Scene();
@@ -70,6 +73,9 @@ export class Wake {
     private readonly hull: { length: number; beam: number },
   ) {
     this.texture = this.target.texture;
+    this.halfExtent = Math.max(250, hull.length * 9);
+    this.pointSpacing = Math.max(1.5, hull.length * 0.045);
+    this.wakeLife = 45 * Math.sqrt(hull.length / REFERENCE_LENGTH);
 
     const indices: number[] = [];
     for (let ribbon = 0; ribbon < RIBBON_COUNT; ribbon++) {
@@ -85,7 +91,7 @@ export class Wake {
     const mesh = new THREE.Mesh(
       this.geometry,
       new THREE.ShaderMaterial({
-        uniforms: { uCenter: { value: this.center }, uHalfExtent: { value: MAP_HALF_EXTENT } },
+        uniforms: { uCenter: { value: this.center }, uHalfExtent: { value: this.halfExtent } },
         vertexShader,
         fragmentShader,
         // 선회할 때 띠가 겹치는 곳은 물거품이 더해지도록 가산 혼합을 사용한다.
@@ -113,10 +119,10 @@ export class Wake {
   private recordTrail(elapsed: number, ship: ShipState): void {
     const { trail } = this;
     const newest = trail[0];
-    if (!newest || Math.hypot(ship.x - newest.x, ship.z - newest.z) >= POINT_SPACING) {
+    if (!newest || Math.hypot(ship.x - newest.x, ship.z - newest.z) >= this.pointSpacing) {
       trail.unshift({ x: ship.x, z: ship.z, heading: ship.heading, speed: Math.abs(ship.surge), time: elapsed });
     }
-    while (trail.length > MAX_POINTS - 1 || (trail.length > 0 && elapsed - trail[trail.length - 1].time > MAX_AGE)) {
+    while (trail.length > MAX_POINTS - 1 || (trail.length > 0 && elapsed - trail[trail.length - 1].time > this.wakeLife * 2.7)) {
       trail.pop();
     }
   }
@@ -149,14 +155,14 @@ export class Wake {
         z - sternOffset * cos,
         cos,
         sin,
-        0.32 * beam + Math.min(age * 0.25, 14),
-        strength * 0.9 * Math.exp(-age / 45),
+        beam * (0.32 + Math.min((age / this.wakeLife) * 0.28, 0.35)),
+        strength * 0.9 * Math.exp(-age / this.wakeLife),
       );
 
       // 선수에서 갈라지는 물결: 발생한 뒤로 바깥쪽으로 계속 이동하므로 V자 형태가 된다.
       const spread = 0.12 * beam + speed * age * KELVIN_SPREAD;
-      const armHalfWidth = 2.5 + Math.min(age * 0.12, 6.5);
-      const armStrength = strength * Math.exp(-age / 30);
+      const armHalfWidth = beam * (0.0625 + Math.min((age / this.wakeLife) * 0.135, 0.1625));
+      const armStrength = strength * Math.exp(-age / (this.wakeLife * 0.67));
       const bowX = x + bowOffset * sin;
       const bowZ = z - bowOffset * cos;
       this.writeStation(1, i, bowX + spread * cos, bowZ + spread * sin, cos, sin, armHalfWidth, armStrength);

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>요트 모델 미리보기</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #9cc3d6;
+      }
+      #hint {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        font: 12px/1.4 system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hint">드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동 · W: 수면 표시 전환</div>
+    <script type="module">
+      import * as THREE from 'three';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+      import { Sky } from 'three/addons/objects/Sky.js';
+
+      const DRAFT = 0.75;
+      const query = new URLSearchParams(location.search);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(devicePixelRatio);
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.58;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      // 먼바다가 수평선의 연무에 묻히도록 한다.
+      scene.fog = new THREE.Fog(0xc9dde8, 400, 2600);
+
+      // 하늘과 태양
+      const sunDirection = new THREE.Vector3().setFromSphericalCoords(
+        1,
+        THREE.MathUtils.degToRad(90 - 46),
+        THREE.MathUtils.degToRad(Number(query.get('sun') ?? 115)),
+      );
+      const sky = new Sky();
+      sky.scale.setScalar(10000);
+      Object.assign(sky.material.uniforms.turbidity, { value: 3.5 });
+      Object.assign(sky.material.uniforms.rayleigh, { value: 1.1 });
+      Object.assign(sky.material.uniforms.mieCoefficient, { value: 0.004 });
+      Object.assign(sky.material.uniforms.mieDirectionalG, { value: 0.85 });
+      sky.material.uniforms.sunPosition.value.copy(sunDirection);
+
+      // 하늘과 바다 색을 환경 맵으로 구워서 선체의 반사에 사용한다.
+      const environmentScene = new THREE.Scene();
+      environmentScene.add(sky);
+      const seaDisc = new THREE.Mesh(new THREE.CircleGeometry(95, 48), new THREE.MeshBasicMaterial({ color: 0x1d5f7a }));
+      seaDisc.rotation.x = -Math.PI / 2;
+      seaDisc.position.y = -1.5;
+      environmentScene.add(seaDisc);
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(environmentScene).texture;
+      scene.add(sky);
+
+      const sun = new THREE.DirectionalLight(0xfff3e0, 3.2);
+      sun.position.copy(sunDirection).multiplyScalar(40);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(4096, 4096);
+      Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 90 });
+      sun.shadow.bias = -0.0004;
+      sun.shadow.normalBias = 0.02;
+      scene.add(sun);
+
+      // 수면: 사인파를 합성한 노멀 맵으로 잔물결을 표현한다.
+      function createWaterNormals() {
+        const SIZE = 256;
+        const waves = [];
+        let seed = 7;
+        const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        for (let k = 0; k < 14; k++) {
+          const kx = Math.round((random() * 2 - 1) * 14);
+          const ky = Math.sign(random() - 0.5) * Math.round(3 + random() * 11);
+          waves.push({ kx, ky, amplitude: 1 / Math.hypot(kx, ky), phase: random() * 6.283 });
+        }
+        const data = new Uint8Array(SIZE * SIZE * 4);
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            let sx = 0;
+            let sy = 0;
+            for (const w of waves) {
+              const slope = w.amplitude * Math.cos((6.283 * (w.kx * x + w.ky * y)) / SIZE + w.phase);
+              sx += slope * w.kx;
+              sy += slope * w.ky;
+            }
+            const inverse = 1 / Math.hypot(sx, sy, 1);
+            const i = (y * SIZE + x) * 4;
+            data[i] = (-sx * inverse * 0.5 + 0.5) * 255;
+            data[i + 1] = (-sy * inverse * 0.5 + 0.5) * 255;
+            data[i + 2] = (inverse * 0.5 + 0.5) * 255;
+            data[i + 3] = 255;
+          }
+        }
+        const texture = new THREE.DataTexture(data, SIZE, SIZE);
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.generateMipmaps = true;
+        texture.anisotropy = 8;
+        texture.repeat.set(900, 900);
+        texture.needsUpdate = true;
+        return texture;
+      }
+      const waterNormals = createWaterNormals();
+      const water = new THREE.Mesh(
+        new THREE.PlaneGeometry(3000, 3000),
+        new THREE.MeshPhysicalMaterial({
+          color: 0x0d5a74,
+          envMapIntensity: 0.45,
+          roughness: 0.22,
+          normalMap: waterNormals,
+          normalScale: new THREE.Vector2(0.07, 0.07),
+          transparent: true,
+          opacity: 0.93,
+        }),
+      );
+      water.rotation.x = -Math.PI / 2;
+      water.position.y = DRAFT;
+      water.receiveShadow = true;
+      water.visible = query.get('water') !== '0';
+      scene.add(water);
+
+      const camera = new THREE.PerspectiveCamera(Number(query.get('fov') ?? 30), innerWidth / innerHeight, 0.1, 20000);
+      camera.position.fromArray((query.get('cam') ?? '21,4.6,-13.5').split(',').map(Number));
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.fromArray((query.get('target') ?? '0,1.7,0.2').split(',').map(Number));
+      controls.enableDamping = true;
+      controls.minDistance = 2;
+      controls.maxDistance = 150;
+
+      const gltf = await new GLTFLoader().loadAsync(`/models/yacht/sport-yacht.glb?v=${Date.now()}`);
+      const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+      gltf.scene.traverse((object) => {
+        if (!object.isMesh) return;
+        object.castShadow = true;
+        object.receiveShadow = true;
+        if (object.material.map) object.material.map.anisotropy = maxAnisotropy;
+      });
+      scene.add(gltf.scene);
+
+      // 시점을 지정하지 않았으면 창의 비율에 맞춰서 선체 전체가 보이는 거리로 물러난다.
+      if (!query.has('cam')) {
+        const sphere = new THREE.Box3().setFromObject(gltf.scene).getBoundingSphere(new THREE.Sphere());
+        const verticalHalf = THREE.MathUtils.degToRad(camera.fov / 2);
+        const horizontalHalf = Math.atan(Math.tan(verticalHalf) * camera.aspect);
+        const distance = (sphere.radius * 0.92) / Math.sin(Math.min(verticalHalf, horizontalHalf));
+        const direction = camera.position.clone().sub(controls.target).normalize();
+        camera.position.copy(controls.target).addScaledVector(direction, distance);
+      }
+
+      addEventListener('keydown', (e) => {
+        if (e.code === 'KeyW') water.visible = !water.visible;
+      });
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+      const clock = new THREE.Clock();
+      renderer.setAnimationLoop(() => {
+        const elapsed = clock.getElapsedTime();
+        waterNormals.offset.set(elapsed * 0.012, elapsed * 0.02);
+        controls.update();
+        renderer.render(scene, camera);
+      });
+      document.title = '요트 모델 미리보기 (loaded)';
+    </script>
+  </body>
+</html>

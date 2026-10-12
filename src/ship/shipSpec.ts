@@ -97,3 +97,50 @@ export const OCEAN_LINER: ShipSpec = {
     targetHeight: 20,
   },
 };
+
+/**
+ * 직접 제작한 15m급 스포츠 요트 모델. 원본이 미터 단위이고 선수가 -Z를 향하므로 변환 없이 사용한다.
+ * 최고 속력은 약 32노트이고 5초 안에 도달하며, 전속에서의 선회 반경은 약 40m이다.
+ */
+export const SPORT_YACHT: ShipSpec = {
+  model: {
+    url: '/models/yacht/sport-yacht.glb',
+    sourceLength: 15.27,
+    length: 15.27,
+    beam: 4.3,
+    // 선체 바닥의 방오 도료가 끝나는 높이를 수면으로 삼는다.
+    draft: 0.8,
+    bowTowardPositiveZ: false,
+  },
+  physics: {
+    thrustAccel: 3.0,
+    reverseThrustRatio: 0.4,
+    surgeLinearDrag: 0.05,
+    surgeQuadraticDrag: 0.008,
+    swayDrag: 2.5,
+    rudderGain: 0.049,
+    propWashGain: 0.2,
+    yawLinearDrag: 1.8,
+    yawQuadraticDrag: 1.0,
+    // 가벼운 선체는 바람의 영향을 크게 받는다. 초속 15m의 옆바람에서 약 1m/s로 밀린다.
+    windSurge: 0.002,
+    windSway: 0.011,
+    windYaw: 0.00024,
+  },
+  controls: {
+    throttleRate: 0.8,
+    rudderRate: 1.8,
+  },
+  motion: {
+    // 활주하는 소형 선박은 대형 선박과 반대로 선회의 안쪽으로 기울어진다.
+    heelGain: -0.02,
+    waveResponse: 3.5,
+    rollRatio: 0.8,
+  },
+  camera: {
+    distance: 45,
+    minDistance: 14,
+    maxDistance: 400,
+    targetHeight: 2.5,
+  },
+};
