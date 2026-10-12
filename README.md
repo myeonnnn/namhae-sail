@@ -151,9 +151,11 @@ scripts/        요트 모델을 생성하는 스크립트, 해안선과 지명,
 
 ## 자료의 출처와 라이선스
 
+이 저장소의 코드는 [MIT 라이선스](LICENSE)를 따릅니다. 저장소에 포함된 아래의 자료는 각각의 라이선스를 따르며, MIT 라이선스의 적용 대상이 아닙니다. 특히 `public/data/`의 파일은 OpenStreetMap의 자료를 가공한 것이므로 ODbL을 따릅니다.
+
 | 자료 | 출처 | 라이선스 |
 |---|---|---|
 | 해안선, 지명, 방파제, 다리, 시가지, 해상 표지 | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, Overpass API로 추출해서 저장소에 포함 | ODbL |
 | 표고 | [Mapzen Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (AWS Open Data), 육지는 NASA SRTM 기반 | 구성 자료별 라이선스 |
 | 여객선 모델 | [Kenney Watercraft Kit](https://kenney.nl/) | CC0 |
-| 요트 모델 | `scripts/build-yacht.mjs`로 직접 생성 | 이 저장소와 동일 |
+| 요트 모델 | `scripts/build-yacht.mjs`로 직접 생성 | MIT (이 저장소의 코드와 동일) |
