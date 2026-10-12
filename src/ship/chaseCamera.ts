@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { ShipState } from './shipPhysics';
 import type { ShipSpec } from './shipSpec';
 
 const FOLLOW_STIFFNESS = 2.5;
@@ -7,12 +6,21 @@ const MIN_PITCH = 0.06;
 const MAX_PITCH = 1.3;
 const SHAKE_DURATION = 0.6;
 
-/** 배의 뒤쪽을 따라가는 카메라. 드래그로 시점을 돌리고 휠로 거리를 조절한다. */
+/** 카메라가 따라가는 대상. 배의 상태를 그대로 넘기거나, 관찰 모드에서는 관찰 지점을 넘긴다. */
+export interface CameraTarget {
+  x: number;
+  z: number;
+  heading: number;
+}
+
+/** 대상의 뒤쪽을 따라가는 카메라. 드래그로 시점을 돌리고 휠로 거리를 조절한다. */
 export class ChaseCamera {
   private followHeading = 0;
   private yawOffset = 0;
   private pitch = 0.28;
   private distance: number;
+  private minDistance: number;
+  private maxDistance: number;
   private readonly target = new THREE.Vector3();
   private shakeStrength = 0;
   private shakeRemaining = 0;
@@ -23,6 +31,8 @@ export class ChaseCamera {
     private readonly spec: ShipSpec['camera'],
   ) {
     this.distance = spec.distance;
+    this.minDistance = spec.minDistance;
+    this.maxDistance = spec.maxDistance;
 
     element.addEventListener('pointerdown', (event) => element.setPointerCapture(event.pointerId));
     element.addEventListener('pointermove', (event) => {
@@ -34,7 +44,7 @@ export class ChaseCamera {
       'wheel',
       (event) => {
         event.preventDefault();
-        this.distance = THREE.MathUtils.clamp(this.distance * Math.exp(event.deltaY * 0.001), spec.minDistance, spec.maxDistance);
+        this.distance = THREE.MathUtils.clamp(this.distance * Math.exp(event.deltaY * 0.001), this.minDistance, this.maxDistance);
       },
       { passive: false },
     );
@@ -51,11 +61,27 @@ export class ChaseCamera {
     this.shakeRemaining = SHAKE_DURATION;
   }
 
+  /** 카메라가 바라보는 방위 (rad) */
+  get viewHeading(): number {
+    return this.followHeading + this.yawOffset;
+  }
+
+  get viewDistance(): number {
+    return this.distance;
+  }
+
+  /** 휠로 조절할 수 있는 거리의 범위를 바꾼다. 범위를 지정하지 않으면 선박의 사양에 정해진 범위로 되돌린다. */
+  setDistanceRange(min = this.spec.minDistance, max = this.spec.maxDistance): void {
+    this.minDistance = min;
+    this.maxDistance = max;
+    this.distance = THREE.MathUtils.clamp(this.distance, min, max);
+  }
+
   resetView(): void {
     this.yawOffset = 0;
   }
 
-  update(dt: number, ship: ShipState): void {
+  update(dt: number, ship: CameraTarget): void {
     // 선회할 때 카메라가 약간 늦게 따라오도록 침로를 지수 감쇠로 추종한다.
     const headingError = Math.atan2(
       Math.sin(ship.heading - this.followHeading),

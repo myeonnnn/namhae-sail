@@ -1,17 +1,21 @@
 // OpenStreetMap에서 운영 구역(src/geo/region.json)의 지명, 방파제와 부두, 다리, 시가지를 내려받아서
 // public/data/chart.json으로 저장한다. 해도에 육지의 지물을 표시하는 데 사용한다.
-// 실행: node scripts/fetch-chart.mjs
+// 실행: node scripts/fetch-chart.mjs          (내려받은 원본이 .cache에 있으면 다시 사용한다)
+//       node scripts/fetch-chart.mjs --fresh  (항상 새로 내려받는다)
 // 자료의 라이선스는 ODbL이며, 화면에 "© OpenStreetMap contributors"를 표기해야 한다.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'public/data/chart.json');
+const CACHE = resolve(ROOT, '.cache/chart-raw.json');
 const { bounds: REGION, dataMargin: MARGIN } = JSON.parse(readFileSync(resolve(ROOT, 'src/geo/region.json'), 'utf8'));
 const BBOX = [REGION.south - MARGIN, REGION.west - MARGIN, REGION.north + MARGIN, REGION.east + MARGIN].join(',');
 // 이 거리(m)보다 작은 굴곡은 생략한다.
 const SIMPLIFY_TOLERANCE = 8;
+// 방파제와 부두는 폭이 몇 미터에 불과해서, 같은 기준을 적용하면 윤곽이 한 줄의 선으로 뭉개진다.
+const STRUCTURE_TOLERANCE = 1;
 // 이 면적(m²)보다 작은 시가지는 지도의 축척에서 점으로 보이므로 제외한다.
 const MIN_URBAN_AREA = 40000;
 const ENDPOINTS = [
@@ -62,7 +66,7 @@ const toMeters = ([lon, lat]) => [lon * METERS_PER_DEG * cosLat, lat * METERS_PE
 const round = (value) => Number(value.toFixed(5));
 
 /** Douglas–Peucker: 양 끝을 잇는 직선에서 가장 먼 점이 허용 오차 안에 있으면 중간의 점을 모두 버린다. */
-function simplify(points) {
+function simplify(points, tolerance = SIMPLIFY_TOLERANCE) {
   if (points.length < 3) return points;
   const meters = points.map(toMeters);
   const keep = new Uint8Array(points.length);
@@ -84,12 +88,22 @@ function simplify(points) {
         index = i;
       }
     }
-    if (worst > SIMPLIFY_TOLERANCE) {
+    if (worst > tolerance) {
       keep[index] = 1;
       stack.push([first, index], [index, last]);
     }
   }
   return points.filter((_, i) => keep[i]);
+}
+
+/**
+ * 닫힌 윤곽을 단순화한다.
+ * 닫힌 윤곽은 첫 점과 끝 점이 같아서, 그대로 단순화하면 양 끝을 잇는 직선의 길이가 0이 되어 모든 점이 버려진다.
+ * 그래서 윤곽을 둘로 나누어서 각각 단순화한 다음에 다시 잇는다.
+ */
+function simplifyRing(points, tolerance = SIMPLIFY_TOLERANCE) {
+  const half = Math.floor(points.length / 2);
+  return [...simplify(points.slice(0, half + 1), tolerance).slice(0, -1), ...simplify(points.slice(half), tolerance)];
 }
 
 function area(points) {
@@ -99,7 +113,18 @@ function area(points) {
   return Math.abs(sum) / 2;
 }
 
-const { elements } = await request();
+async function loadElements() {
+  if (existsSync(CACHE) && !process.argv.includes('--fresh')) {
+    console.log(`보관해 둔 원본을 사용합니다: ${CACHE}`);
+    return JSON.parse(readFileSync(CACHE, 'utf8'));
+  }
+  const { elements } = await request();
+  mkdirSync(dirname(CACHE), { recursive: true });
+  writeFileSync(CACHE, JSON.stringify(elements));
+  return elements;
+}
+
+const elements = await loadElements();
 
 const places = [];
 const structures = [];
@@ -126,12 +151,13 @@ for (const element of elements) {
     });
   } else if (tags.man_made && line) {
     // 방파제와 부두는 선으로 그린 것과 면으로 그린 것이 섞여 있다.
-    structures.push({ kind: tags.man_made, closed, points: simplify(line).map(([lon, lat]) => [round(lon), round(lat)]) });
+    const points = closed ? simplifyRing(line, STRUCTURE_TOLERANCE) : simplify(line, STRUCTURE_TOLERANCE);
+    structures.push({ kind: tags.man_made, closed, points: points.map(([lon, lat]) => [round(lon), round(lat)]) });
   } else if (tags.bridge && line) {
     bridges.push({ name: tags.name, points: simplify(line).map(([lon, lat]) => [round(lon), round(lat)]) });
   } else if (tags.landuse && closed) {
     if (area(line) < MIN_URBAN_AREA) continue;
-    urban.push(simplify(line).map(([lon, lat]) => [round(lon), round(lat)]));
+    urban.push(simplifyRing(line).map(([lon, lat]) => [round(lon), round(lat)]));
   }
 }
 

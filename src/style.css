@@ -522,7 +522,8 @@ body {
 
 .hud-alert {
   position: absolute;
-  top: var(--hud-margin);
+  /* 관찰 모드의 안내가 같은 자리에 표시되므로, 경고는 그 아래에 둔다. */
+  top: calc(var(--hud-margin) + 40px);
   left: 50%;
   transform: translateX(-50%);
   padding: 8px 14px;
@@ -569,4 +570,61 @@ body {
 /* 속력의 자릿수가 바뀌어도 계기판의 폭이 변하지 않도록 고정한다. */
 .hud-readouts {
   min-width: 150px;
+}
+
+/* 관찰 모드의 안내 */
+
+.hud-mode-hint {
+  position: absolute;
+  top: var(--hud-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: var(--hud-surface);
+  border: 1px solid var(--hud-ahead);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+}
+
+.hud-mode-hint strong {
+  margin-right: 8px;
+  color: var(--hud-ahead);
+  font-weight: 600;
+}
+
+.hud-mode-hint kbd,
+.hud-devtools kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  margin: 0 1px;
+  padding: 0 4px;
+  border: 1px solid var(--hud-border);
+  border-radius: 3px;
+  background: rgba(232, 241, 248, 0.1);
+  font: 10px/1.5 var(--hud-font-number);
+  text-align: center;
+}
+
+/* 설정 메뉴의 개발 도구 */
+
+.hud-devtools {
+  display: grid;
+  gap: 6px;
+}
+
+#hud .hud-devtools button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+}
+
+.hud-devtools select {
+  padding: 5px 6px;
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  background: rgba(8, 20, 34, 0.9);
+  color: var(--hud-text);
+  font: inherit;
 }

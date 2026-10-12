@@ -106,6 +106,11 @@ export class Wake {
     this.scene.add(mesh);
   }
 
+  /** 기록한 경로를 지운다. 배를 다른 곳으로 옮겼을 때, 이전의 위치에서 새 위치까지 물거품이 이어지지 않게 한다. */
+  reset(): void {
+    this.trail.length = 0;
+  }
+
   update(elapsed: number, ship: ShipState): void {
     this.recordTrail(elapsed, ship);
     this.buildRibbons(elapsed, ship);

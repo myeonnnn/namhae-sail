@@ -22,20 +22,10 @@ import Text from 'ol/style/Text';
 import { worldToLatLon } from '../geo/projection';
 import region from '../geo/region.json';
 import type { ShipState } from '../ship/shipPhysics';
+import { loadChart, type ChartPlace, type PlaceKind } from '../world/chartData';
 import { loadSeamarkRecords, type SeamarkRecord } from '../world/seamarkData';
 
 const LAND_URL = '/data/land.json';
-const CHART_URL = '/data/chart.json';
-
-/** scripts/fetch-chart.mjs가 저장하는 형식 */
-interface ChartData {
-  places: { kind: PlaceKind; name: string; lat: number; lon: number; ele?: number }[];
-  structures: { kind: string; closed: boolean; points: [number, number][] }[];
-  bridges: { name?: string; points: [number, number][] }[];
-  urban: [number, number][][];
-}
-type PlaceKind = 'city' | 'town' | 'village' | 'island' | 'islet' | 'peak';
-
 // 지명은 종류에 따라 글자의 크기와 표시를 시작하는 축척이 다르다. 한 픽셀이 maxResolution(m)보다 넓으면 숨긴다.
 const PLACE_STYLES: Record<PlaceKind, { font: string; color: string; maxResolution: number }> = {
   city: { font: '600 12px', color: '#1b2733', maxResolution: Infinity },
@@ -98,6 +88,8 @@ export class Minimap {
     enableRotation: false,
   });
   private readonly shipFeature = new Feature(new Point([0, 0]));
+  // 관찰 모드에서 카메라가 보고 있는 지점을 표시하는 십자선
+  private readonly focusFeature = new Feature(new Point([0, 0]));
   private readonly shipIcon = new Icon({ src: SHIP_ICON, rotateWithView: false });
   private readonly track = new LineString([]);
   private readonly markStyles = new Map<string, Style>();
@@ -141,6 +133,11 @@ export class Minimap {
       .catch((error) => console.warn('지도에 표시할 해상 표지를 불러오지 못했습니다.', error));
 
     this.shipFeature.setStyle(new Style({ image: this.shipIcon }));
+    this.focusFeature.setStyle(
+      new Style({
+        image: new RegularShape({ points: 4, radius: 9, radius2: 0, stroke: new Stroke({ color: '#1b2733', width: 2 }) }),
+      }),
+    );
 
     // 시가지, 방파제와 부두, 다리, 지명은 하나의 파일로 받아서 종류별 레이어에 나누어 넣는다.
     const urban = new VectorSource();
@@ -148,11 +145,7 @@ export class Minimap {
     const bridges = new VectorSource();
     const places = new VectorSource();
     const ring = (points: [number, number][]) => points.map((point) => fromLonLat(point));
-    void fetch(CHART_URL)
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<ChartData>;
-      })
+    void loadChart()
       .then((chart) => {
         urban.addFeatures(chart.urban.map((points) => new Feature(new Polygon([ring(points)]))));
         // 방파제와 부두는 면으로 등록된 것과 선으로 등록된 것이 섞여 있다.
@@ -209,11 +202,11 @@ export class Minimap {
         }),
         new VectorLayer({
           source: places,
-          style: (feature, resolution) => this.placeStyle(feature.get('place') as ChartData['places'][number], resolution),
+          style: (feature, resolution) => this.placeStyle(feature.get('place') as ChartPlace, resolution),
           // 이름표가 서로 겹치면 나중에 그려지는 쪽을 생략한다.
           declutter: true,
         }),
-        new VectorLayer({ source: new VectorSource({ features: [this.shipFeature] }) }),
+        new VectorLayer({ source: new VectorSource({ features: [this.shipFeature, this.focusFeature] }) }),
       ],
       controls: [
         new ScaleLine({ units: 'metric', minWidth: 48 }),
@@ -250,16 +243,30 @@ export class Minimap {
     );
   }
 
-  update(ship: ShipState): void {
+  /** 항적을 지운다. 배를 다른 곳으로 옮겼을 때, 이전의 위치와 새 위치가 직선으로 이어지지 않게 한다. */
+  resetTrack(): void {
+    this.track.setCoordinates([]);
+    this.lastTrackX = Infinity;
+    this.lastTrackZ = Infinity;
+  }
+
+  /**
+   * @param focus 관찰 모드에서 카메라가 보고 있는 지점. 지정하면 지도가 배 대신 이 지점을 따라가고, 경위도도 이 지점의 값을 표시한다.
+   */
+  update(ship: ShipState, focus?: { x: number; z: number }): void {
     const now = performance.now();
     if (now - this.lastRefreshTime < REFRESH_INTERVAL_MS) return;
     this.lastRefreshTime = now;
 
     const { lat, lon } = worldToLatLon(ship.x, ship.z);
     const coordinate = fromLonLat([lon, lat]);
-    this.position.textContent = `${formatAngle(lat, 'N', 'S')}  ${formatAngle(lon, 'E', 'W')}`;
+    const centre = focus ? worldToLatLon(focus.x, focus.z) : { lat, lon };
+    const centreCoordinate = fromLonLat([centre.lon, centre.lat]);
+    this.position.textContent = `${formatAngle(centre.lat, 'N', 'S')}  ${formatAngle(centre.lon, 'E', 'W')}`;
 
-    this.view.setCenter(coordinate);
+    this.view.setCenter(centreCoordinate);
+    // 십자선은 관찰 모드에서만 보이도록, 평소에는 지도의 범위 밖으로 치워 둔다.
+    (this.focusFeature.getGeometry() as Point).setCoordinates(focus ? centreCoordinate : [0, 0]);
     (this.shipFeature.getGeometry() as Point).setCoordinates(coordinate);
     this.shipIcon.setRotation(ship.heading);
 
@@ -274,7 +281,7 @@ export class Minimap {
   }
 
   /** 지명의 이름표. 산의 봉우리는 높이를 함께 표시한다. */
-  private placeStyle(place: ChartData['places'][number], resolution: number): Style | undefined {
+  private placeStyle(place: ChartPlace, resolution: number): Style | undefined {
     const { font, color, maxResolution } = PLACE_STYLES[place.kind];
     if (resolution > maxResolution) return undefined;
     return new Style({

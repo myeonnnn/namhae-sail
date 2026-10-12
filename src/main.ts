@@ -1,5 +1,6 @@
 import './style.css';
 import { Input } from './core/input';
+import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
 import { createStage } from './core/renderer';
 import { createTimeOfDay, sunPosition } from './environment/sun';
@@ -11,11 +12,14 @@ import { ChaseCamera } from './ship/chaseCamera';
 import { ImpactSpray } from './ship/impactSpray';
 import { Ship } from './ship/ship';
 import { SPORT_YACHT } from './ship/shipSpec';
+import { createDevTools } from './ui/devTools';
 import { Hud } from './ui/hud';
 import { SeamarkInspector } from './ui/seamarkInspector';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
 import region from './geo/region.json';
+import { loadChart } from './world/chartData';
 import { Seamarks } from './world/seamarks';
+import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
 
 // 운영 구역과 시작 위치는 src/geo/region.json에서 정한다. 자료를 내려받는 스크립트도 같은 파일을 읽는다.
@@ -23,6 +27,10 @@ import { Terrain } from './world/terrain';
 const SHIP = SPORT_YACHT;
 
 const START = region.start;
+
+// 개발 도구(관찰 모드, 배의 순간 이동, 장소로 바로 이동, 주소로 시작 위치 지정)는 로컬의 개발 서버에서만 켠다.
+// Vite는 배포용으로 빌드할 때 import.meta.env.DEV를 false로 바꾸므로, 이 조건으로 감싼 코드는 결과물에서 제거된다.
+const DEV_TOOLS = import.meta.env.DEV;
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
 const stage = createStage(canvas);
@@ -34,20 +42,25 @@ const timeOfDay = createTimeOfDay();
 const wake = new Wake(renderer, SHIP.model);
 const ocean = new Ocean(scene, renderer, wake);
 const ship = new Ship(SHIP);
-// 주소에 ?lat=35.08&lon=129.11&heading=300과 같이 적으면 그 위치와 방향에서 시작한다. 특정 장소를 확인할 때 사용한다.
+// (개발 서버에서만) 주소에 ?lat=34.83&lon=128.43&heading=300과 같이 적으면 그 위치와 방향에서 시작한다. 특정 장소를 확인할 때 사용한다.
+// &observe를 덧붙이면 배는 기본 위치에 두고, 그 좌표를 관찰 모드로 바라보면서 시작한다. 육지 위의 좌표도 지정할 수 있다.
 const query = new URLSearchParams(location.search);
 const queryNumber = (name: string, fallback: number) => {
-  const value = Number(query.get(name) ?? NaN);
+  const value = DEV_TOOLS ? Number(query.get(name) ?? NaN) : NaN;
   return Number.isFinite(value) ? value : fallback;
 };
-const start = latLonToWorld({ lat: queryNumber('lat', START.lat), lon: queryNumber('lon', START.lon) });
+const startInObserver = DEV_TOOLS && query.has('observe');
+const queryPoint = latLonToWorld({ lat: queryNumber('lat', START.lat), lon: queryNumber('lon', START.lon) });
+const start = startInObserver ? latLonToWorld(START) : queryPoint;
 ship.state.x = start.x;
 ship.state.z = start.z;
 ship.state.heading = (queryNumber('heading', START.headingDeg) * Math.PI) / 180;
 scene.add(ship.object);
 
 const terrain = new Terrain(scene);
-const seamarks = new Seamarks(scene, (x, z) => terrain.heightAt(x, z));
+const structures = new Structures(scene);
+// 등대와 등표는 방파제 위에 있으면 그 윗면에, 아니면 지형 위에 세운다.
+const seamarks = new Seamarks(scene, (x, z) => structures.topNear(x, z, 8) ?? terrain.heightAt(x, z));
 
 const chaseCamera = new ChaseCamera(camera, canvas, SHIP.camera);
 chaseCamera.alignTo(ship.state.heading);
@@ -81,10 +94,67 @@ function playImpact(speed: number, movingAhead: boolean, strength = 1): void {
   impactSpray.burst(x + Math.sin(heading) * reach, 0.5, z - Math.cos(heading) * reach, intensity, SHIP.model.beam);
   chaseCamera.shake(intensity);
 }
+// ---- 관찰 모드와 개발 도구 ----
+const observer = new Observer();
+// 관찰 모드에서 휠로 조절할 수 있는 카메라 거리의 범위 (m). 구역 전체를 내려다볼 수 있을 만큼 멀리 허용한다.
+const OBSERVER_DISTANCE_RANGE = [20, 9000] as const;
+
+function setObserver(active: boolean): void {
+  if (active === observer.active) return;
+  if (active) {
+    observer.enter(ship.state.x, ship.state.z, ship.state.heading);
+    chaseCamera.setDistanceRange(...OBSERVER_DISTANCE_RANGE);
+  } else {
+    observer.exit();
+    chaseCamera.setDistanceRange();
+  }
+}
+
+/** 배를 관찰 지점으로 옮긴다. 육지나 구조물 위, 구역의 바깥으로는 옮기지 않는다. */
+function moveShipToObserver(): void {
+  if (!observer.active) return;
+  const { x, z } = observer;
+  if (isOutsideRegion(x, z) || terrain.isLand(x, z) || structures.contains(x, z)) {
+    alert.message = '이 위치로는 배를 옮길 수 없습니다 (육지, 구조물 또는 구역의 바깥)';
+    alert.at = performance.now();
+    return;
+  }
+  Object.assign(ship.state, { x, z, surge: 0, sway: 0, yawRate: 0 });
+  ship.controls.throttle = 0;
+  // 이전의 위치에서 새 위치까지 항적이 이어지지 않도록 기록을 지운다.
+  wake.reset();
+  hud.resetTrack();
+  setObserver(false);
+}
+
+if (DEV_TOOLS) {
+  hud.addSettingsSection(
+    '개발 도구',
+    createDevTools(
+      loadChart().then((chart) => chart.places),
+      {
+        toggleObserver: () => setObserver(!observer.active),
+        moveShipHere: moveShipToObserver,
+        goToPlace: (place) => {
+          setObserver(true);
+          Object.assign(observer, latLonToWorld(place));
+        },
+      },
+    ),
+  );
+}
+
+if (startInObserver) {
+  setObserver(true);
+  Object.assign(observer, queryPoint);
+}
+
 const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement>('#hud')!, canvas, seamarks);
 
 startLoop({
   update(dt) {
+    // 관찰 모드에서는 조종에 쓰는 키로 카메라를 움직이므로, 배의 시간을 멈춘다.
+    if (observer.active) return;
     ship.update(dt, input, windVelocity(wind));
     simulationTime += dt;
     // 충돌을 처리하면 속도가 0이 되므로, 연출에 사용할 속력을 먼저 기록한다.
@@ -102,6 +172,13 @@ startLoop({
 
     if (ship.resolveGrounding((x, z) => terrain.isLand(x, z))) {
       alert.message = '좌초: 후진(S)으로 이탈';
+      alert.at = performance.now();
+      playImpact(impactSpeed, movingAhead);
+      return;
+    }
+
+    if (ship.resolveGrounding((x, z) => structures.contains(x, z))) {
+      alert.message = '방파제 또는 부두와 충돌: 후진(S)으로 이탈';
       alert.at = performance.now();
       playImpact(impactSpeed, movingAhead);
       return;
@@ -130,15 +207,23 @@ startLoop({
   },
   render(frameTime, elapsed) {
     if (input.isDown('KeyC')) chaseCamera.resetView();
+    if (DEV_TOOLS) {
+      if (input.consumePress('KeyF')) setObserver(!observer.active);
+      if (input.consumePress('KeyT')) moveShipToObserver();
+    }
+    if (observer.active) observer.update(frameTime, input, chaseCamera.viewHeading, chaseCamera.viewDistance);
+    // 지형과 표지, 수면의 격자는 카메라가 보고 있는 곳을 중심으로 불러오고 배치한다.
+    const focus = observer.active ? observer : ship.state;
+
     updateWaves(wind, frameTime);
     ship.syncObject(elapsed, frameTime);
-    chaseCamera.update(frameTime, ship.state);
-    terrain.update(ship.state.x, ship.state.z);
-    seamarks.update(elapsed, ship.state.x, ship.state.z);
+    chaseCamera.update(frameTime, focus);
+    terrain.update(focus.x, focus.z);
+    seamarks.update(elapsed, focus.x, focus.z);
     wake.update(elapsed, ship.state);
     // 맵의 범위 안에서는 위치에 따른 태양의 차이가 1° 미만이므로, 고정된 기준 지점으로 계산한다.
     ocean.setSun(sunPosition(timeOfDay, WORLD_ORIGIN));
-    ocean.update(elapsed, ship.state.x, ship.state.z, camera, canvas.clientHeight, wind);
+    ocean.update(elapsed, focus.x, focus.z, camera, canvas.clientHeight, wind);
     impactSpray.update(frameTime);
     hud.update({
       camera,
@@ -147,6 +232,7 @@ startLoop({
       wind,
       engine: { rpm: ship.rpm, maxRpm: SHIP.engine.maxRpm },
       alert,
+      focus: observer.active ? observer : undefined,
     });
     seamarkInspector.update(camera, ship.state);
     renderer.render(scene, camera);
