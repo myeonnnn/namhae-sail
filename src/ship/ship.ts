@@ -23,6 +23,8 @@ export class Ship {
   readonly controls: ShipControls = { throttle: 0, rudder: 0 };
   /** 선수가 -Z를 향하고 원점이 수면 높이에 놓이는 그룹. 모델은 비동기로 불러와서 이 안에 추가한다. */
   readonly object = new THREE.Group();
+  /** 선박의 모델을 불러오면 완료된다. 실패해도 완료되므로, 시작 화면이 끝없이 기다리지 않는다. */
+  readonly ready: Promise<void>;
   /** 엔진의 회전수 (rpm). 스로틀을 조금 늦게 따라간다. */
   rpm: number;
   private heave = 0;
@@ -35,7 +37,7 @@ export class Ship {
   constructor(private readonly spec: ShipSpec) {
     this.rpm = spec.engine.idleRpm;
     this.object.rotation.order = 'YXZ';
-    void this.loadModel();
+    this.ready = this.loadModel().catch((error) => console.warn('선박의 모델을 불러오지 못했습니다.', error));
   }
 
   update(dt: number, input: Input, wind: { x: number; z: number }): void {

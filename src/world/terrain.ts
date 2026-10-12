@@ -38,6 +38,8 @@ export class Terrain {
   });
   private readonly decodeContext: OffscreenCanvasRenderingContext2D;
   private lastRefreshTime = -Infinity;
+  private pendingTiles = 0;
+  private requestedAny = false;
   // 해안선 자료를 불러오지 못해도 지형은 표시되어야 하므로, 실패하면 마스크 없이 표고만으로 진행한다.
   private readonly landMask = LandMask.load(TILE_ZOOM, TILE_PIXELS).catch((error) => {
     console.warn('해안선 자료를 불러오지 못해서 표고만으로 육지를 판정합니다.', error);
@@ -81,6 +83,11 @@ export class Terrain {
     }
   }
 
+  /** 주변의 표고 타일을 한 번 이상 요청했고, 그 요청이 모두 끝났으면 true. 시작 화면이 준비 여부를 판단하는 데 사용한다. */
+  get isSettled(): boolean {
+    return this.requestedAny && this.pendingTiles === 0;
+  }
+
   /**
    * 월드의 (x, z) 지점이 수면 위로 솟은 땅인지 판정한다.
    * 원본 표고가 아니라 화면에 그려진 메시의 높이를 읽으므로, 눈에 보이는 해안선과 판정이 일치한다.
@@ -116,6 +123,8 @@ export class Terrain {
 
   private async loadTile(key: string, tile: TerrainTile, tileX: number, tileY: number): Promise<void> {
     const url = tileUrl(TILE_ZOOM, tileX, tileY);
+    this.requestedAny = true;
+    this.pendingTiles++;
     try {
       const [response, landMask] = await Promise.all([fetch(url), this.landMask]);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -137,6 +146,8 @@ export class Terrain {
     } catch (error) {
       // 실패한 타일은 목록에 남겨 두어서 반복해서 요청하지 않는다. 배가 멀어졌다가 돌아오면 다시 시도한다.
       console.warn(`표고 타일을 불러오지 못했습니다: ${url}`, error);
+    } finally {
+      this.pendingTiles--;
     }
   }
 }

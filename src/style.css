@@ -628,3 +628,99 @@ body {
   color: var(--hud-text);
   font: inherit;
 }
+
+/* 화면 구석의 출처 표기 */
+
+.hud-credits {
+  position: absolute;
+  right: var(--hud-margin);
+  bottom: 6px;
+  color: rgba(232, 241, 248, 0.6);
+  font-size: 10px;
+  text-shadow: 0 0 3px rgba(8, 20, 34, 0.9);
+}
+
+/* 시작 화면 */
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 20, 34, 0.55);
+  backdrop-filter: blur(5px);
+  color: #e8f1f8;
+  font: 14px/1.6 var(--hud-font);
+  transition: opacity 0.4s ease;
+}
+
+.start-screen-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.start-card {
+  width: min(440px, 100%);
+  padding: 28px 30px 26px;
+  background: rgba(8, 20, 34, 0.82);
+  border: 1px solid var(--hud-border);
+  border-radius: 14px;
+}
+
+.start-card h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.start-summary {
+  margin: 0 0 18px;
+  color: var(--hud-text-muted);
+}
+
+.start-notice {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  background: rgba(255, 180, 92, 0.14);
+  border: 1px solid rgba(255, 180, 92, 0.5);
+  border-radius: 8px;
+  color: #ffd9a8;
+  font-size: 13px;
+}
+
+.start-keys {
+  padding: 14px 0;
+  border-top: 1px solid var(--hud-border);
+  border-bottom: 1px solid var(--hud-border);
+  font-size: 13px;
+}
+
+.start-status {
+  margin-top: 18px;
+  color: var(--hud-text-muted);
+  text-align: center;
+}
+
+.start-card button {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 11px;
+  border: none;
+  border-radius: 8px;
+  background: var(--hud-ahead);
+  color: #0b1a2a;
+  font: 600 15px/1 var(--hud-font);
+  cursor: pointer;
+}
+
+.start-card button:hover {
+  background: #a5dfff;
+}
+
+.start-card button[hidden] {
+  display: none;
+}

@@ -63,7 +63,12 @@ export class Hud {
     }
     this.modeHint.hidden = true;
 
-    root.append(bottom, right, this.modeHint, this.alert);
+    // 지도 안의 출처 표기는 OpenStreetMap만 다루므로, 3D 지형에 사용한 표고 자료의 출처는 화면의 구석에 따로 표기한다.
+    const credits = document.createElement('div');
+    credits.className = 'hud-credits';
+    credits.textContent = '지형 표고: Mapzen Terrain Tiles, NASA SRTM · 지도 자료 © OpenStreetMap contributors';
+
+    root.append(bottom, right, this.modeHint, this.alert, credits);
 
     window.addEventListener('resize', () => this.fitConsole());
     this.fitConsole();

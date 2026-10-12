@@ -15,9 +15,11 @@ import { SPORT_YACHT } from './ship/shipSpec';
 import { createDevTools } from './ui/devTools';
 import { Hud } from './ui/hud';
 import { SeamarkInspector } from './ui/seamarkInspector';
+import { StartScreen } from './ui/startScreen';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
 import region from './geo/region.json';
 import { loadChart } from './world/chartData';
+import { loadSeamarkRecords } from './world/seamarkData';
 import { Seamarks } from './world/seamarks';
 import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
@@ -151,8 +153,21 @@ if (startInObserver) {
 
 const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement>('#hud')!, canvas, seamarks);
 
+// ---- 시작 화면 ----
+const startScreen = new StartScreen(document.body);
+// 개발 서버에서 주소로 위치를 지정했을 때에는 특정 장소를 바로 확인하려는 것이므로 시작 화면을 건너뛴다.
+if (DEV_TOOLS && (query.has('lat') || query.has('observe') || query.has('skipIntro'))) startScreen.dismiss();
+// 선박의 모델과 지도의 자료를 받은 다음에, 주변의 지형이 모두 그려질 때까지 기다린다.
+// 자료를 받지 못해도 시작은 할 수 있어야 하므로 실패는 무시하고, 15초가 지나면 기다리지 않는다.
+const assetsLoaded = Promise.allSettled([ship.ready, loadChart(), loadSeamarkRecords()]);
+let assetsDone = false;
+void assetsLoaded.then(() => (assetsDone = true));
+window.setTimeout(() => startScreen.markReady(), 15000);
+
 startLoop({
   update(dt) {
+    // 시작 화면이 떠 있는 동안에는 배가 바람에 밀려서 움직이지 않도록 시간을 멈춘다.
+    if (!startScreen.dismissed) return;
     // 관찰 모드에서는 조종에 쓰는 키로 카메라를 움직이므로, 배의 시간을 멈춘다.
     if (observer.active) return;
     ship.update(dt, input, windVelocity(wind));
@@ -206,6 +221,7 @@ startLoop({
     }
   },
   render(frameTime, elapsed) {
+    if (assetsDone && terrain.isSettled) startScreen.markReady();
     if (input.isDown('KeyC')) chaseCamera.resetView();
     if (DEV_TOOLS) {
       if (input.consumePress('KeyF')) setObserver(!observer.active);
