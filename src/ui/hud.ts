@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import type { TimeOfDay } from '../environment/sun';
 import type { Wind } from '../environment/wind';
 import type { ShipControls, ShipState } from '../ship/shipPhysics';
 import { EnvironmentPanel } from './environmentPanel';
@@ -29,7 +30,7 @@ export class Hud {
   private readonly instruments: Instruments;
   private readonly alert = document.createElement('div');
 
-  constructor(root: HTMLElement, wind: Wind) {
+  constructor(root: HTMLElement, wind: Wind, timeOfDay: TimeOfDay) {
     const bottom = document.createElement('div');
     bottom.className = 'hud-bottom';
     this.minimap = new Minimap(bottom);
@@ -40,7 +41,7 @@ export class Hud {
 
     const right = document.createElement('div');
     right.className = 'hud-column hud-column-right';
-    new EnvironmentPanel(right, wind);
+    new EnvironmentPanel(right, wind, timeOfDay);
 
     this.alert.className = 'hud-alert';
     this.alert.textContent = '좌초: 후진(S)으로 이탈';

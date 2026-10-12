@@ -135,6 +135,11 @@ export class Ship {
     model.scale.setScalar(length / sourceLength);
     model.position.y = -draft;
     if (bowTowardPositiveZ) model.rotation.y = Math.PI;
+    // 연돌과 선실이 갑판에 그림자를 드리우도록 한다.
+    model.traverse((child) => {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    });
     this.object.add(model);
   }
 }

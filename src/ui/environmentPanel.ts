@@ -1,4 +1,6 @@
+import { sunPosition, type TimeOfDay } from '../environment/sun';
 import { compassName, MAX_WIND_SPEED, type Wind } from '../environment/wind';
+import { WORLD_ORIGIN } from '../geo/projection';
 import { significantWaveHeight } from '../ocean/waves';
 
 const MS_TO_KNOTS = 1.943844;
@@ -11,19 +13,21 @@ const SLIDERS_ICON = `
     <circle cx="5" cy="8" r="1.8" />
     <circle cx="11" cy="12" r="1.8" />
   </svg>`;
-const TOGGLE_LABEL = '바람 설정';
+const TOGGLE_LABEL = '시각과 바람 설정';
 
 /**
- * 바람과 파도의 상태를 요약해서 표시한다.
+ * 시각과 바람, 파도의 상태를 요약해서 표시한다.
  * 조절 막대는 평소에는 접혀 있고, 버튼을 누르면 펼쳐진다. 값을 바꾸면 전달받은 객체에 즉시 반영한다.
  */
 export class EnvironmentPanel {
+  private readonly timeSummary = document.createElement('div');
   private readonly windSummary = document.createElement('div');
   private readonly waveSummary = document.createElement('div');
 
   constructor(
     root: HTMLElement,
     private readonly wind: Wind,
+    private readonly timeOfDay: TimeOfDay,
   ) {
     const panel = document.createElement('div');
     panel.className = 'hud-panel hud-environment';
@@ -33,12 +37,14 @@ export class EnvironmentPanel {
     const lines = document.createElement('div');
     this.windSummary.className = 'hud-environment-wind';
     this.waveSummary.className = 'hud-label';
-    lines.append(this.windSummary, this.waveSummary);
+    this.timeSummary.className = 'hud-environment-wind';
+    lines.append(this.timeSummary, this.windSummary, this.waveSummary);
 
     const controls = document.createElement('div');
     controls.className = 'hud-environment-controls';
     controls.hidden = true;
     controls.append(
+      this.createSlider('시각', 5, 20, 0.25, timeOfDay.hour, (value) => (timeOfDay.hour = value)),
       this.createSlider('풍속', 0, MAX_WIND_SPEED, 0.5, wind.speed, (value) => (wind.speed = value)),
       this.createSlider('풍향', 0, 355, 5, wind.fromDeg, (value) => (wind.fromDeg = value)),
     );
@@ -66,6 +72,12 @@ export class EnvironmentPanel {
   }
 
   private refresh(): void {
+    const { hour } = this.timeOfDay;
+    const { elevationDeg } = sunPosition(this.timeOfDay, WORLD_ORIGIN);
+    const clock = `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.round((hour % 1) * 60)).padStart(2, '0')}`;
+    this.timeSummary.textContent =
+      elevationDeg > 0 ? `${clock} · 태양 고도 ${elevationDeg.toFixed(0)}°` : `${clock} · 해가 진 상태`;
+
     const { speed, fromDeg } = this.wind;
     this.windSummary.textContent =
       speed < 0.1
