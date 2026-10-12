@@ -49,7 +49,8 @@ export interface ShipSpec {
 /**
  * Kenney Watercraft Kit의 여객선 모델(CC0).
  * 원본의 비율이 실제 선박보다 짧고 높아서, 폭이 약 40m가 되는 길이로 맞췄다.
- * 최고 속력은 약 22노트이고, 전속에서의 선회 반경은 약 380m이다.
+ * 실제 선박의 수치를 그대로 적용하면 조종이 지나치게 느리므로, 가속과 선회를 게임에 맞춰서 과장했다.
+ * 최고 속력은 약 30노트이고 정지 상태에서 약 20초 만에 도달하며, 전속에서의 선회 반경은 약 230m이다.
  */
 export const OCEAN_LINER: ShipSpec = {
   model: {
@@ -61,22 +62,22 @@ export const OCEAN_LINER: ShipSpec = {
     bowTowardPositiveZ: true,
   },
   physics: {
-    thrustAccel: 0.25,
+    thrustAccel: 1.0,
     reverseThrustRatio: 0.5,
-    surgeLinearDrag: 0.004,
-    surgeQuadraticDrag: 0.0016,
-    swayDrag: 0.5,
-    rudderGain: 0.0004,
-    propWashGain: 0.0015,
-    yawLinearDrag: 0.15,
-    yawQuadraticDrag: 2.0,
+    surgeLinearDrag: 0.01,
+    surgeQuadraticDrag: 0.0035,
+    swayDrag: 0.8,
+    rudderGain: 0.0026,
+    propWashGain: 0.008,
+    yawLinearDrag: 0.5,
+    yawQuadraticDrag: 1.0,
   },
   controls: {
-    throttleRate: 0.4,
-    rudderRate: 0.4,
+    throttleRate: 0.8,
+    rudderRate: 0.8,
   },
   motion: {
-    heelGain: 0.15,
+    heelGain: 0.05,
     waveResponse: 1.2,
     rollRatio: 0.6,
   },
