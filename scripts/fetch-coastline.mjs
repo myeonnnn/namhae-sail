@@ -8,15 +8,12 @@
 // 이웃한 선분은 끝점을 공유하므로, 끝점이 같은 선분을 이어 붙이면 섬은 닫힌 고리가 되고 본토는 범위의 바깥에서 끊긴 긴 선이 된다.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createGeometry } from './lib/geometry.mjs';
+import { queryOverpass } from './lib/overpass.mjs';
+import { DATA_BOUNDS, ROOT } from './lib/region.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'public/data/land.json');
 const CACHE = resolve(ROOT, '.cache/coastline-rings.json');
-// dataMargin은 운영 구역의 바깥으로 더 포함하는 범위(도)이다. 구역의 경계 근처에서도 지도와 지형이 끊겨 보이지 않게 한다.
-const { bounds: REGION, dataMargin: REGION_MARGIN } = JSON.parse(
-  readFileSync(resolve(ROOT, 'src/geo/region.json'), 'utf8'),
-);
 // 해안선을 조립하는 범위 (남, 서, 북, 동). 운영 구역보다 훨씬 넓게 잡는다.
 // 좁은 범위만 내려받으면 본토와 큰 섬의 해안선이 범위의 경계에서 여러 조각으로 끊겨서, 올바른 폴리곤으로 닫을 수 없다.
 const BOUNDS = [33.0, 125.0, 35.5, 129.5];
@@ -26,35 +23,6 @@ const GRID = { columns: 3, rows: 2 };
 const SIMPLIFY_TOLERANCE = 6;
 // 이 면적(m²)보다 작은 암초는 제외한다.
 const MIN_AREA = 300;
-const ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
-
-async function request(query) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    for (const endpoint of ENDPOINTS) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'namhae-sail (coastline preprocessing)',
-          },
-          body: `data=${encodeURIComponent(query)}`,
-        });
-        if (response.ok) return await response.json();
-        console.warn(`${endpoint}: HTTP ${response.status}`);
-      } catch (error) {
-        console.warn(`${endpoint}: ${error.message}`);
-      }
-    }
-    await new Promise((done) => setTimeout(done, 15000));
-  }
-  throw new Error('모든 Overpass 서버에서 요청이 실패했습니다. 잠시 후에 다시 실행하세요.');
-}
-
 /** 내려받은 선분을 이어 붙인 고리의 목록을 반환한다. 내려받기는 오래 걸리고 서버에 부담을 주므로 결과를 보관한다. */
 async function loadChains() {
   if (existsSync(CACHE) && !process.argv.includes('--fresh')) {
@@ -71,8 +39,9 @@ async function loadChains() {
       const n = south + ((north - south) * (row + 1)) / GRID.rows;
       const w = west + ((east - west) * column) / GRID.columns;
       const e = west + ((east - west) * (column + 1)) / GRID.columns;
-      const { elements } = await request(
+      const { elements } = await queryOverpass(
         `[out:json][timeout:180];way["natural"="coastline"](${s},${w},${n},${e});out geom qt;`,
+        { purpose: 'coastline preprocessing' },
       );
       // 격자의 경계에 걸친 선분은 양쪽에서 모두 반환되므로 id로 중복을 제거한다.
       for (const way of elements) ways.set(way.id, way);
@@ -117,58 +86,10 @@ const chains = await loadChains();
 const [south, , north] = BOUNDS;
 
 // ---- 3. 단순화 ----
-const METERS_PER_DEG = 111320;
-const cosLat = Math.cos((((south + north) / 2) * Math.PI) / 180);
-const toMeters = ([lon, lat]) => [lon * METERS_PER_DEG * cosLat, lat * METERS_PER_DEG];
+const { simplifyRing, area } = createGeometry((south + north) / 2);
 
-/** Douglas–Peucker: 양 끝을 잇는 직선에서 가장 먼 점이 허용 오차 안에 있으면 중간의 점을 모두 버린다. */
-function simplify(points, tolerance) {
-  const meters = points.map(toMeters);
-  const keep = new Uint8Array(points.length);
-  keep[0] = keep[points.length - 1] = 1;
-  const stack = [[0, points.length - 1]];
-  while (stack.length) {
-    const [first, last] = stack.pop();
-    const [ax, ay] = meters[first];
-    const [bx, by] = meters[last];
-    const dx = bx - ax;
-    const dy = by - ay;
-    const length = Math.hypot(dx, dy) || 1;
-    let worst = 0;
-    let index = -1;
-    for (let i = first + 1; i < last; i++) {
-      const distance = Math.abs((meters[i][0] - ax) * dy - (meters[i][1] - ay) * dx) / length;
-      if (distance > worst) {
-        worst = distance;
-        index = i;
-      }
-    }
-    if (worst > tolerance) {
-      keep[index] = 1;
-      stack.push([first, index], [index, last]);
-    }
-  }
-  return points.filter((_, i) => keep[i]);
-}
-
-function area(points) {
-  const meters = points.map(toMeters);
-  let sum = 0;
-  for (let i = 0; i < meters.length; i++) {
-    const [x1, y1] = meters[i];
-    const [x2, y2] = meters[(i + 1) % meters.length];
-    sum += x1 * y2 - x2 * y1;
-  }
-  return Math.abs(sum) / 2;
-}
-
-const clip = {
-  west: REGION.west - REGION_MARGIN,
-  east: REGION.east + REGION_MARGIN,
-  south: REGION.south - REGION_MARGIN,
-  north: REGION.north + REGION_MARGIN,
-};
-
+// 운영 구역에 자료의 여유 범위를 더한 직사각형으로 잘라 낸다.
+const clip = DATA_BOUNDS;
 /**
  * 폴리곤을 직사각형으로 잘라 낸다 (Sutherland–Hodgman).
  * 직사각형의 네 변을 차례로 기준으로 삼아서, 변의 안쪽에 있는 부분만 남기고 변과 만나는 지점에 새 꼭짓점을 넣는다.
@@ -218,11 +139,7 @@ for (const { points: chainPoints, closed } of chains) {
   if (points.length < 4) continue;
   rawPoints += points.length;
   // 단순화는 양 끝을 고정하므로, 고리를 둘로 나누어서 처리한다.
-  const half = Math.floor(points.length / 2);
-  const ring = [
-    ...simplify(points.slice(0, half + 1), SIMPLIFY_TOLERANCE).slice(0, -1),
-    ...simplify(points.slice(half), SIMPLIFY_TOLERANCE),
-  ];
+  const ring = simplifyRing(points, SIMPLIFY_TOLERANCE);
   if (ring.length < 4 || area(ring) < MIN_AREA) continue;
   const rounded = ring.map(([lon, lat]) => [Number(lon.toFixed(5)), Number(lat.toFixed(5))]);
   const [firstLon, firstLat] = rounded[0];

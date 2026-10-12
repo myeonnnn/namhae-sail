@@ -6,9 +6,10 @@
 // 자료의 라이선스는 ODbL이며, 화면에 "© OpenStreetMap contributors"를 표기해야 한다.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createGeometry } from './lib/geometry.mjs';
+import { queryOverpass } from './lib/overpass.mjs';
+import { DATA_BBOX as BBOX, REGION, ROOT } from './lib/region.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'public/data/chart.json');
 const CACHE = resolve(ROOT, '.cache/chart-raw.json');
 const LAND = resolve(ROOT, 'public/data/land.json');
@@ -21,20 +22,12 @@ const TALL_BRIDGE_CLEARANCE = 50;
 const FOOTBRIDGE_CLEARANCE = 5;
 const TALL_STRUCTURES = ['cable-stayed', 'suspension'];
 const FOOTWAYS = ['footway', 'path', 'pedestrian', 'cycleway', 'steps'];
-const { bounds: REGION, dataMargin: MARGIN } = JSON.parse(readFileSync(resolve(ROOT, 'src/geo/region.json'), 'utf8'));
-const BBOX = [REGION.south - MARGIN, REGION.west - MARGIN, REGION.north + MARGIN, REGION.east + MARGIN].join(',');
 // 이 거리(m)보다 작은 굴곡은 생략한다.
 const SIMPLIFY_TOLERANCE = 8;
 // 방파제와 부두는 폭이 몇 미터에 불과해서, 같은 기준을 적용하면 윤곽이 한 줄의 선으로 뭉개진다.
 const STRUCTURE_TOLERANCE = 1;
 // 이 면적(m²)보다 작은 시가지는 지도의 축척에서 점으로 보이므로 제외한다.
 const MIN_URBAN_AREA = 40000;
-const ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
-
 const QUERY = `
 [out:json][timeout:120];
 (
@@ -48,88 +41,18 @@ const QUERY = `
 );
 out geom;`;
 
-async function request() {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    for (const endpoint of ENDPOINTS) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'namhae-sail (chart preprocessing)',
-          },
-          body: `data=${encodeURIComponent(QUERY)}`,
-        });
-        if (response.ok) return await response.json();
-        console.warn(`${endpoint}: HTTP ${response.status}`);
-      } catch (error) {
-        console.warn(`${endpoint}: ${error.message}`);
-      }
-    }
-    await new Promise((done) => setTimeout(done, 15000));
-  }
-  throw new Error('모든 Overpass 서버에서 요청이 실패했습니다. 잠시 후에 다시 실행하세요.');
-}
-
-const METERS_PER_DEG = 111320;
-const cosLat = Math.cos((((REGION.south + REGION.north) / 2) * Math.PI) / 180);
-const toMeters = ([lon, lat]) => [lon * METERS_PER_DEG * cosLat, lat * METERS_PER_DEG];
+const geometry = createGeometry((REGION.south + REGION.north) / 2);
+const { toMeters, area } = geometry;
+const simplify = (points, tolerance = SIMPLIFY_TOLERANCE) => geometry.simplify(points, tolerance);
+const simplifyRing = (points, tolerance = SIMPLIFY_TOLERANCE) => geometry.simplifyRing(points, tolerance);
 const round = (value) => Number(value.toFixed(5));
-
-/** Douglas–Peucker: 양 끝을 잇는 직선에서 가장 먼 점이 허용 오차 안에 있으면 중간의 점을 모두 버린다. */
-function simplify(points, tolerance = SIMPLIFY_TOLERANCE) {
-  if (points.length < 3) return points;
-  const meters = points.map(toMeters);
-  const keep = new Uint8Array(points.length);
-  keep[0] = keep[points.length - 1] = 1;
-  const stack = [[0, points.length - 1]];
-  while (stack.length) {
-    const [first, last] = stack.pop();
-    const [ax, ay] = meters[first];
-    const [bx, by] = meters[last];
-    const dx = bx - ax;
-    const dy = by - ay;
-    const length = Math.hypot(dx, dy) || 1;
-    let worst = 0;
-    let index = -1;
-    for (let i = first + 1; i < last; i++) {
-      const distance = Math.abs((meters[i][0] - ax) * dy - (meters[i][1] - ay) * dx) / length;
-      if (distance > worst) {
-        worst = distance;
-        index = i;
-      }
-    }
-    if (worst > tolerance) {
-      keep[index] = 1;
-      stack.push([first, index], [index, last]);
-    }
-  }
-  return points.filter((_, i) => keep[i]);
-}
-
-/**
- * 닫힌 윤곽을 단순화한다.
- * 닫힌 윤곽은 첫 점과 끝 점이 같아서, 그대로 단순화하면 양 끝을 잇는 직선의 길이가 0이 되어 모든 점이 버려진다.
- * 그래서 윤곽을 둘로 나누어서 각각 단순화한 다음에 다시 잇는다.
- */
-function simplifyRing(points, tolerance = SIMPLIFY_TOLERANCE) {
-  const half = Math.floor(points.length / 2);
-  return [...simplify(points.slice(0, half + 1), tolerance).slice(0, -1), ...simplify(points.slice(half), tolerance)];
-}
-
-function area(points) {
-  const meters = points.map(toMeters);
-  let sum = 0;
-  for (let i = 0; i < meters.length - 1; i++) sum += meters[i][0] * meters[i + 1][1] - meters[i + 1][0] * meters[i][1];
-  return Math.abs(sum) / 2;
-}
 
 async function loadElements() {
   if (existsSync(CACHE) && !process.argv.includes('--fresh')) {
     console.log(`보관해 둔 원본을 사용합니다: ${CACHE}`);
     return JSON.parse(readFileSync(CACHE, 'utf8'));
   }
-  const { elements } = await request();
+  const { elements } = await queryOverpass(QUERY, { purpose: 'chart preprocessing', attempts: 4 });
   mkdirSync(dirname(CACHE), { recursive: true });
   writeFileSync(CACHE, JSON.stringify(elements));
   return elements;

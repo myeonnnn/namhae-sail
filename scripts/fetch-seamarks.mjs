@@ -2,28 +2,19 @@
 // 실행: node scripts/fetch-seamarks.mjs
 // 자료의 라이선스는 ODbL이며, 화면에 "© OpenStreetMap contributors"를 표기해야 한다.
 // Overpass API는 공용 서버이므로 실행 중에 요청하지 않고, 이 스크립트로 한 번만 받아서 정적 파일로 사용한다.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { queryOverpass } from './lib/overpass.mjs';
+import { DATA_BBOX, ROOT } from './lib/region.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'public/data/seamarks.json');
-const { bounds: REGION, dataMargin: MARGIN } = JSON.parse(readFileSync(resolve(ROOT, 'src/geo/region.json'), 'utf8'));
-// 구역의 경계 바로 바깥에 있는 표지도 화면에 보이므로, region.json의 dataMargin만큼 넓게 받는다.
-// 남, 서, 북, 동의 순서
-const BOUNDS = [REGION.south - MARGIN, REGION.west - MARGIN, REGION.north + MARGIN, REGION.east + MARGIN];
-// 공용 서버는 혼잡할 때 요청을 거절하므로, 순서대로 시도한다.
-const ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
 
+// 구역의 경계 바로 바깥에 있는 표지도 화면에 보이므로, 자료의 여유 범위까지 받는다.
 const QUERY = `
 [out:json][timeout:120];
 (
-  node["seamark:type"~"^(light_major|light_minor|beacon_.*|buoy_.*)$"](${BOUNDS.join(',')});
-  node["man_made"="lighthouse"](${BOUNDS.join(',')});
+  node["seamark:type"~"^(light_major|light_minor|beacon_.*|buoy_.*)$"](${DATA_BBOX});
+  node["man_made"="lighthouse"](${DATA_BBOX});
 );
 out body;`;
 
@@ -48,27 +39,7 @@ function tagWithPrefix(tags, suffix) {
   return key ? tags[key] : undefined;
 }
 
-async function request() {
-  for (const endpoint of ENDPOINTS) {
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'namhae-sail (seamark preprocessing)',
-        },
-        body: `data=${encodeURIComponent(QUERY)}`,
-      });
-      if (response.ok) return await response.json();
-      console.warn(`${endpoint}: HTTP ${response.status}`);
-    } catch (error) {
-      console.warn(`${endpoint}: ${error.message}`);
-    }
-  }
-  throw new Error('모든 Overpass 서버에서 요청이 실패했습니다. 잠시 후에 다시 실행하세요.');
-}
-
-const { elements } = await request();
+const { elements } = await queryOverpass(QUERY, { purpose: 'seamark preprocessing' });
 
 const marks = [];
 for (const { lat, lon, tags = {} } of elements) {
