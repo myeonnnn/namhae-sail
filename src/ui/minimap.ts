@@ -56,7 +56,7 @@ export class Minimap {
 
     const attribution = document.createElement('div');
     attribution.className = 'hud-minimap-attribution';
-    attribution.textContent = '© OpenStreetMap contributors · OpenSeaMap';
+    attribution.textContent = '© OpenStreetMap contributors · OpenSeaMap · 표고: Mapzen, SRTM';
 
     panel.append(this.canvas, controls, attribution);
     root.append(panel);

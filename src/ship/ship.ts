@@ -8,6 +8,15 @@ import type { ShipSpec } from './shipSpec';
 // 선체의 길이와 폭에 대한 비율로 표현한 수면의 측정 위치
 const HULL_SAMPLES_ALONG = [-0.42, -0.28, -0.14, 0, 0.14, 0.28, 0.42];
 const HULL_SAMPLES_ACROSS = [-0.35, 0, 0.35];
+// 육지와의 접촉을 검사하는 지점: 선수, 선수 좌우, 중앙 좌우, 선미
+const HULL_CONTACT_POINTS = [
+  [0.48, 0],
+  [0.3, -0.4],
+  [0.3, 0.4],
+  [0, -0.5],
+  [0, 0.5],
+  [-0.48, 0],
+] as const;
 
 export class Ship {
   readonly state: ShipState = createShipState();
@@ -15,6 +24,9 @@ export class Ship {
   /** 선수가 -Z를 향하고 원점이 수면 높이에 놓이는 그룹. 모델은 비동기로 불러와서 이 안에 추가한다. */
   readonly object = new THREE.Group();
   private heave = 0;
+  private previousX = 0;
+  private previousZ = 0;
+  private previousHeading = 0;
   private pitch = 0;
   private roll = 0;
 
@@ -38,7 +50,34 @@ export class Ship {
     const rudderTarget = input.axis(['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']);
     controls.rudder = moveToward(controls.rudder, rudderTarget, spec.controls.rudderRate * dt);
 
+    this.previousX = this.state.x;
+    this.previousZ = this.state.z;
+    this.previousHeading = this.state.heading;
     stepShip(this.state, controls, spec.physics, dt);
+  }
+
+  /**
+   * 선체가 육지에 닿았으면 직전의 위치로 되돌리고 멈춘다.
+   * 스로틀은 그대로 두므로, 후진으로 바꾸면 빠져나올 수 있다.
+   */
+  resolveGrounding(isLand: (x: number, z: number) => boolean): boolean {
+    const { state, spec } = this;
+    const sin = Math.sin(state.heading);
+    const cos = Math.cos(state.heading);
+    const touching = HULL_CONTACT_POINTS.some(([along, across]) => {
+      const forward = along * spec.model.length;
+      const starboard = across * spec.model.beam;
+      return isLand(state.x + forward * sin + starboard * cos, state.z - forward * cos + starboard * sin);
+    });
+    if (!touching) return false;
+
+    state.x = this.previousX;
+    state.z = this.previousZ;
+    state.heading = this.previousHeading;
+    state.surge = 0;
+    state.sway = 0;
+    state.yawRate = 0;
+    return true;
   }
 
   /**

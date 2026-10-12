@@ -37,6 +37,11 @@ export class ChaseCamera {
     );
   }
 
+  /** 카메라가 따라가는 침로를 즉시 맞춘다. 배의 시작 방향이 북쪽이 아닐 때 처음부터 선미 쪽에서 바라보게 한다. */
+  alignTo(heading: number): void {
+    this.followHeading = heading;
+  }
+
   resetView(): void {
     this.yawOffset = 0;
   }

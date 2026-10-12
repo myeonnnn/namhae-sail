@@ -41,6 +41,7 @@ const fragmentShader = /* glsl */ `
 
   // 픽셀 하나가 차지하는 시야각 (rad)
   uniform float uPixelAngle;
+  uniform float uHazeDistance;
   uniform vec3 uSunDirection;
   uniform vec3 uSunColor;
   uniform vec3 uDeepColor;
@@ -122,7 +123,7 @@ const fragmentShader = /* glsl */ `
 
     // 먼 수면을 그 방향의 수평선 색상으로 수렴시켜서 바다의 끝과 하늘의 경계를 감춘다.
     vec3 horizonColor = textureCube(uSky, normalize(vec3(-viewDirection.x, 0.03, -viewDirection.z)), 1.5).rgb;
-    float haze = 1.0 - exp(-pow(cameraDistance / 7000.0, 2.0));
+    float haze = 1.0 - exp(-pow(cameraDistance / uHazeDistance, 2.0));
     color = mix(color, horizonColor, haze);
 
     gl_FragColor = vec4(color, 1.0);
@@ -135,6 +136,7 @@ export interface OceanMaterialOptions {
   sky: THREE.CubeTexture;
   detailNormals: THREE.Texture;
   wake: { texture: THREE.Texture; center: THREE.Vector2; halfExtent: number };
+  hazeDistance: number;
   sunDirection: THREE.Vector3;
 }
 
@@ -143,6 +145,7 @@ export function createOceanMaterial({
   detailNormals,
   sunDirection,
   wake,
+  hazeDistance,
 }: OceanMaterialOptions): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     defines: { WAVE_COUNT: WAVES.length },
@@ -151,6 +154,7 @@ export function createOceanMaterial({
       uWaveShape: { value: WAVES.map((w) => new THREE.Vector4(w.dirX, w.dirZ, w.k, w.amplitude)) },
       uWaveMotion: { value: WAVES.map((w) => new THREE.Vector4(w.omega, w.q, w.wavelength, 0)) },
       uPixelAngle: { value: 0.0015 },
+      uHazeDistance: { value: hazeDistance },
       uSunDirection: { value: sunDirection },
       uSunColor: { value: new THREE.Color(1.0, 0.86, 0.66).multiplyScalar(30) },
       uDeepColor: { value: new THREE.Color(0.004, 0.034, 0.062) },

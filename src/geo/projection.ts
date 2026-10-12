@@ -51,6 +51,26 @@ export function latLonToTile({ lat, lon }: LatLon, zoom: number): { x: number; y
   };
 }
 
+/** 월드 좌표를 웹 지도 타일의 좌표로 변환한다. */
+export function worldToTile(x: number, z: number, zoom: number): { x: number; y: number } {
+  return latLonToTile(worldToLatLon(x, z), zoom);
+}
+
+/**
+ * 타일이 월드에서 차지하는 영역을 반환한다.
+ * 타일은 메르카토르 좌표에서 정사각형이고 월드 좌표는 메르카토르 좌표에 비례하므로, 월드에서도 축에 정렬된 정사각형이다.
+ * (x, z)는 타일의 북서쪽 모서리이고, 타일은 그 지점에서 +X(동쪽)와 +Z(남쪽)로 size만큼 펼쳐진다.
+ */
+export function tileToWorld(tileX: number, tileY: number, zoom: number): { x: number; z: number; size: number } {
+  const circumference = 2 * Math.PI * EARTH_RADIUS;
+  const tileCount = 2 ** zoom;
+  return {
+    x: ((tileX / tileCount - 0.5) * circumference - ORIGIN_MERCATOR_X) * REFERENCE_SCALE,
+    z: -((0.5 - tileY / tileCount) * circumference - ORIGIN_MERCATOR_Y) * REFERENCE_SCALE,
+    size: (circumference / tileCount) * REFERENCE_SCALE,
+  };
+}
+
 /** 주어진 위도와 줌 레벨에서 타일의 한 픽셀이 나타내는 실제 거리 (m) */
 export function metersPerTilePixel(lat: number, zoom: number, tileSize = 256): number {
   return (2 * Math.PI * EARTH_RADIUS * Math.cos(lat * DEG_TO_RAD)) / (tileSize * 2 ** zoom);

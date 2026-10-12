@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { latLonToTile, latLonToWorld, WORLD_ORIGIN, worldToLatLon } from './projection';
+import { latLonToTile, latLonToWorld, tileToWorld, WORLD_ORIGIN, worldToLatLon, worldToTile } from './projection';
 
 const NAUTICAL_MILE = 1852;
 
@@ -40,5 +40,15 @@ describe('projection', () => {
     const tile = latLonToTile({ lat: 35.1, lon: 129.04 }, 10);
     expect(Math.floor(tile.x)).toBe(879);
     expect(Math.floor(tile.y)).toBe(405);
+  });
+
+  it('places a tile so that its corners convert back to its own tile numbers', () => {
+    const { x, z, size } = tileToWorld(3516, 1621, 12);
+    const northWest = worldToTile(x, z, 12);
+    const southEast = worldToTile(x + size, z + size, 12);
+    expect(northWest.x).toBeCloseTo(3516, 6);
+    expect(northWest.y).toBeCloseTo(1621, 6);
+    expect(southEast.x).toBeCloseTo(3517, 6);
+    expect(southEast.y).toBeCloseTo(1622, 6);
   });
 });

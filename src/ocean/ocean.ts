@@ -8,6 +8,10 @@ import { createWaterNormals } from './waterNormals';
 const SUN_ELEVATION_DEG = 20;
 const SUN_AZIMUTH_DEG = 60;
 const SKY_CUBE_SIZE = 256;
+// 이 거리에서 물체의 색상이 약 63%만큼 수평선의 색상으로 바뀐다.
+const HAZE_DISTANCE = 9000;
+// 수평선 부근 하늘의 평균적인 색상. 지형과 같은 일반 물체가 먼 곳에서 이 색상으로 흐려진다.
+const HAZE_COLOR = 0xc3d0db;
 
 /** 수면, 하늘, 태양광을 묶어서 관리한다. 수면과 하늘은 배와 카메라를 따라 이동하므로 끝이 보이지 않는다. */
 export class Ocean {
@@ -58,11 +62,15 @@ export class Ocean {
         detailNormals: createWaterNormals(),
         sunDirection: this.sunDirection,
         wake,
+        hazeDistance: HAZE_DISTANCE,
       }),
     );
     // 정점을 셰이더에서 이동시키므로 Three.js가 계산한 경계 상자로는 화면 밖 여부를 판정할 수 없다.
     this.surface.frustumCulled = false;
     scene.add(this.surface);
+
+    // FogExp2의 감쇠 수식은 수면의 셰이더가 사용하는 수식과 동일하므로, 밀도를 맞추면 바다와 육지가 같은 거리에서 함께 흐려진다.
+    scene.fog = new THREE.FogExp2(HAZE_COLOR, 1 / HAZE_DISTANCE);
 
     const sunLight = new THREE.DirectionalLight(0xfff1dc, 2.5);
     sunLight.position.copy(this.sunDirection).multiplyScalar(100);
