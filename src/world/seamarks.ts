@@ -2,24 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { latLonToWorld } from '../geo/projection';
 import { sampleWaveHeight } from '../ocean/waves';
+import { loadSeamarkRecords, type SeamarkKind, type SeamarkRecord } from './seamarkData';
 
-export type SeamarkKind = 'light' | 'beacon' | 'buoy';
-
-/** scripts/fetch-seamarks.mjs가 저장하는 형식 */
-export interface SeamarkRecord {
-  kind: SeamarkKind;
-  lat: number;
-  lon: number;
-  /** 구조물의 색상 */
-  colour?: string;
-  /** 등화의 색상 */
-  light?: string;
-  /** 등화가 한 번 반복되는 주기 (초) */
-  period?: number;
-  /** 등화의 해수면 기준 높이 (m). 구조물 자체의 높이가 아니다. */
-  height?: number;
-  name?: string;
-}
+export type { SeamarkKind } from './seamarkData';
 
 export interface Seamark extends SeamarkRecord {
   x: number;
@@ -35,7 +20,6 @@ export interface Seamark extends SeamarkRecord {
   phase: number;
 }
 
-const DATA_URL = '/data/seamarks.json';
 // 연무 때문에 이 거리보다 먼 표지는 보이지 않으므로 그리지 않는다.
 const VISIBLE_RADIUS = 9000;
 const REFRESH_INTERVAL_MS = 500;
@@ -313,9 +297,7 @@ export class Seamarks {
 
   private async load(): Promise<void> {
     try {
-      const response = await fetch(DATA_URL);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const records = (await response.json()) as SeamarkRecord[];
+      const records = await loadSeamarkRecords();
       records.forEach((record, index) => {
         const { x, z } = latLonToWorld(record);
         // 황금비를 이용해서 표지마다 고르게 흩어진 어긋남을 준다.

@@ -14,14 +14,15 @@ import { SPORT_YACHT } from './ship/shipSpec';
 import { Hud } from './ui/hud';
 import { SeamarkInspector } from './ui/seamarkInspector';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
+import region from './geo/region.json';
 import { Seamarks } from './world/seamarks';
 import { Terrain } from './world/terrain';
 
-// 부산항 북항의 입구에서 남동쪽으로 약 3km 떨어진 해상. 오륙도의 남쪽이며, 항구를 향해서 출발한다.
+// 운영 구역과 시작 위치는 src/geo/region.json에서 정한다. 자료를 내려받는 스크립트도 같은 파일을 읽는다.
 // 조종할 선박. shipSpec.ts에 정의된 다른 선박으로 바꾸면 모델과 조종 특성, 카메라의 거리가 함께 바뀐다.
 const SHIP = SPORT_YACHT;
 
-const START = { lat: 35.07, lon: 129.125, headingDeg: 315 };
+const START = region.start;
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
 const stage = createStage(canvas);
@@ -52,6 +53,12 @@ const chaseCamera = new ChaseCamera(camera, canvas, SHIP.camera);
 chaseCamera.alignTo(ship.state.heading);
 const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, wind, timeOfDay);
 const alert = { message: '', at: -Infinity };
+
+// 운영 구역의 경계를 월드 좌표로 바꿔 둔다. 북쪽이 -Z이므로, 북쪽 끝의 z가 남쪽 끝의 z보다 작다.
+const regionMin = latLonToWorld({ lat: region.bounds.north, lon: region.bounds.west });
+const regionMax = latLonToWorld({ lat: region.bounds.south, lon: region.bounds.east });
+const isOutsideRegion = (x: number, z: number) =>
+  x < regionMin.x || x > regionMax.x || z < regionMin.z || z > regionMax.z;
 
 // 조작대의 크기는 화면의 크기에 따라 달라지므로, 크기가 바뀔 때마다 카메라에 다시 알려 준다.
 const syncBottomInset = () => stage.setBottomInset(hud.consoleHeight);
@@ -84,6 +91,14 @@ startLoop({
     const { surge, sway } = ship.state;
     const impactSpeed = Math.hypot(surge, sway);
     const movingAhead = surge >= 0;
+
+    if (isOutsideRegion(ship.state.x, ship.state.z)) {
+      // 구역의 바깥에는 지도와 표지의 자료가 없으므로, 경계에서 배를 세운다.
+      alert.message = '항해 구역의 끝입니다: 후진(S)으로 되돌아가세요';
+      alert.at = performance.now();
+      ship.stopAtPreviousPosition();
+      return;
+    }
 
     if (ship.resolveGrounding((x, z) => terrain.isLand(x, z))) {
       alert.message = '좌초: 후진(S)으로 이탈';

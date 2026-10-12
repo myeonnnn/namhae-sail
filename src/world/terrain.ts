@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { tileToWorld, worldToTile } from '../geo/projection';
-import { buildTerrainGeometry, decodeTerrarium, TERRAIN_SEGMENTS, TILE_PIXELS } from './terrainTile';
+import { LandMask } from './landMask';
+import { buildTerrainGeometry, cleanHeights, decodeTerrarium, TERRAIN_SEGMENTS, TILE_PIXELS } from './terrainTile';
 
 // 줌 12에서 타일 한 장은 약 8km이고, 표고 한 픽셀은 약 31m이다.
 const TILE_ZOOM = 12;
@@ -37,6 +38,11 @@ export class Terrain {
   });
   private readonly decodeContext: OffscreenCanvasRenderingContext2D;
   private lastRefreshTime = -Infinity;
+  // 해안선 자료를 불러오지 못해도 지형은 표시되어야 하므로, 실패하면 마스크 없이 표고만으로 진행한다.
+  private readonly landMask = LandMask.load(TILE_ZOOM, TILE_PIXELS).catch((error) => {
+    console.warn('해안선 자료를 불러오지 못해서 표고만으로 육지를 판정합니다.', error);
+    return undefined;
+  });
 
   constructor(private readonly scene: THREE.Scene) {
     this.decodeContext = new OffscreenCanvas(TILE_PIXELS, TILE_PIXELS).getContext('2d', {
@@ -60,7 +66,7 @@ export class Terrain {
         const tile: TerrainTile = tileToWorld(tx, ty, TILE_ZOOM);
         if (distanceToTile(tile, focusX, focusZ) > LOAD_RADIUS) continue;
         this.tiles.set(key, tile);
-        void this.loadTile(key, tile, tileUrl(TILE_ZOOM, tx, ty));
+        void this.loadTile(key, tile, tx, ty);
       }
     }
 
@@ -108,9 +114,10 @@ export class Terrain {
     return north * (1 - fz) + south * fz;
   }
 
-  private async loadTile(key: string, tile: TerrainTile, url: string): Promise<void> {
+  private async loadTile(key: string, tile: TerrainTile, tileX: number, tileY: number): Promise<void> {
+    const url = tileUrl(TILE_ZOOM, tileX, tileY);
     try {
-      const response = await fetch(url);
+      const [response, landMask] = await Promise.all([fetch(url), this.landMask]);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const bitmap = await createImageBitmap(await response.blob());
       // 응답을 기다리는 동안 배가 멀어져서 이미 해제된 타일이면 버린다.
@@ -119,6 +126,7 @@ export class Terrain {
       this.decodeContext.drawImage(bitmap, 0, 0);
       bitmap.close();
       const heights = decodeTerrarium(this.decodeContext.getImageData(0, 0, TILE_PIXELS, TILE_PIXELS).data);
+      cleanHeights(heights, landMask?.rasterize(tileX, tileY));
 
       const built = buildTerrainGeometry(heights, tile.size);
       if (!built) return;

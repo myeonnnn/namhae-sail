@@ -126,6 +126,13 @@ body {
 
 .hud-minimap-view {
   position: relative;
+  /* 높이는 계기판의 높이에 맞춘 값이며, 계기판의 구성을 바꾸면 함께 조정한다. */
+  /* 폭은 아래에 표시하는 경위도의 글자 폭보다 넓게 잡아서, 지도의 옆에 빈 공간이 남지 않게 한다. */
+  width: 196px;
+  height: 169px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #cfe4ee;
 }
 
 .hud-minimap {
@@ -135,9 +142,44 @@ body {
   pointer-events: auto;
 }
 
-.hud-minimap canvas {
-  display: block;
-  border-radius: 4px;
+/* OpenLayers가 기본으로 제공하는 축척 막대와 출처 표기를 지도의 크기에 맞게 줄인다. */
+
+.hud-minimap .ol-scale-line {
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 3px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 3px;
+}
+
+.hud-minimap .ol-scale-line-inner {
+  border: 1.5px solid #1b2733;
+  border-top: none;
+  color: #1b2733;
+  font: 10px/1.3 var(--hud-font-number);
+}
+
+.hud-minimap .ol-attribution {
+  right: 0;
+  bottom: 0;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 3px 0 0 0;
+  color: #1b2733;
+  font-size: 8px;
+  line-height: 13px;
+}
+
+.hud-minimap .ol-attribution ul {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  text-shadow: none;
+}
+
+.hud-minimap .ol-attribution li {
+  display: inline;
 }
 
 .hud-minimap-position {
@@ -147,19 +189,6 @@ body {
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: pre;
-}
-
-/* 출처 표기는 지도의 아래쪽 모서리에 겹쳐서 표시한다. */
-.hud-minimap-attribution {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  padding: 0 4px;
-  background: rgba(255, 255, 255, 0.75);
-  border-radius: 3px 0 4px 0;
-  color: #1b2733;
-  font-size: 8px;
-  line-height: 13px;
 }
 
 /* 계기판 */

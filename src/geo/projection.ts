@@ -71,11 +71,6 @@ export function tileToWorld(tileX: number, tileY: number, zoom: number): { x: nu
   };
 }
 
-/** 주어진 위도와 줌 레벨에서 타일의 한 픽셀이 나타내는 실제 거리 (m) */
-export function metersPerTilePixel(lat: number, zoom: number, tileSize = 256): number {
-  return (2 * Math.PI * EARTH_RADIUS * Math.cos(lat * DEG_TO_RAD)) / (tileSize * 2 ** zoom);
-}
-
 function mercatorX(lon: number): number {
   return EARTH_RADIUS * lon * DEG_TO_RAD;
 }

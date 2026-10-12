@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "ol": "^10.11.0",
     "three": "0.186.1"
   },
   "devDependencies": {

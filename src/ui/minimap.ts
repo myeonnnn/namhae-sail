@@ -1,45 +1,109 @@
-import { latLonToTile, metersPerTilePixel, worldToLatLon } from '../geo/projection';
+import 'ol/ol.css';
+import Feature from 'ol/Feature';
+import OlMap from 'ol/Map';
+import View from 'ol/View';
+import Attribution from 'ol/control/Attribution';
+import ScaleLine from 'ol/control/ScaleLine';
+import GeoJSON from 'ol/format/GeoJSON';
+import LineString from 'ol/geom/LineString';
+import Polygon from 'ol/geom/Polygon';
+import Point from 'ol/geom/Point';
+import VectorLayer from 'ol/layer/Vector';
+import VectorImageLayer from 'ol/layer/VectorImage';
+import { fromLonLat } from 'ol/proj';
+import VectorSource from 'ol/source/Vector';
+import CircleStyle from 'ol/style/Circle';
+import Fill from 'ol/style/Fill';
+import Icon from 'ol/style/Icon';
+import RegularShape from 'ol/style/RegularShape';
+import Stroke from 'ol/style/Stroke';
+import Style from 'ol/style/Style';
+import Text from 'ol/style/Text';
+import { worldToLatLon } from '../geo/projection';
+import region from '../geo/region.json';
 import type { ShipState } from '../ship/shipPhysics';
+import { loadSeamarkRecords, type SeamarkRecord } from '../world/seamarkData';
 
-// 높이는 계기판의 높이에 맞춘 값이며, 계기판의 구성을 바꾸면 함께 조정한다.
-// 폭은 아래에 표시하는 경위도의 글자 폭보다 넓게 잡아서, 지도의 옆에 빈 공간이 남지 않게 한다.
-const VIEW_WIDTH = 196;
-const VIEW_HEIGHT = 169;
-const TILE_SIZE = 256;
+const LAND_URL = '/data/land.json';
+const CHART_URL = '/data/chart.json';
+
+/** scripts/fetch-chart.mjs가 저장하는 형식 */
+interface ChartData {
+  places: { kind: PlaceKind; name: string; lat: number; lon: number; ele?: number }[];
+  structures: { kind: string; closed: boolean; points: [number, number][] }[];
+  bridges: { name?: string; points: [number, number][] }[];
+  urban: [number, number][][];
+}
+type PlaceKind = 'city' | 'town' | 'village' | 'island' | 'islet' | 'peak';
+
+// 지명은 종류에 따라 글자의 크기와 표시를 시작하는 축척이 다르다. 한 픽셀이 maxResolution(m)보다 넓으면 숨긴다.
+const PLACE_STYLES: Record<PlaceKind, { font: string; color: string; maxResolution: number }> = {
+  city: { font: '600 12px', color: '#1b2733', maxResolution: Infinity },
+  town: { font: '500 10px', color: '#3a4652', maxResolution: 90 },
+  island: { font: 'italic 500 10px', color: '#5b4a2c', maxResolution: 160 },
+  village: { font: '400 9px', color: '#55606b', maxResolution: 25 },
+  islet: { font: 'italic 400 9px', color: '#6f5d3c', maxResolution: 40 },
+  peak: { font: '400 9px', color: '#6f5d3c', maxResolution: 25 },
+};
+const LABEL_FONT_FAMILY = "system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+const LABEL_HALO = new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 });
+const DEFAULT_ZOOM = 11;
 const MIN_ZOOM = 7;
 const MAX_ZOOM = 16;
-const DEFAULT_ZOOM = 10;
-const REDRAW_INTERVAL_MS = 100;
-const MAX_CACHED_TILES = 300;
-// 줌을 한 단계 바꾸는 데 필요한 스크롤의 양. 마우스 휠의 한 칸이 대략 100이다.
-const WHEEL_STEP = 100;
+// 줌을 한 단계 바꾸는 데 필요한 스크롤의 양.
+// 마우스 휠의 한 칸이 보내는 값은 운영 체제와 장치에 따라 40에서 120까지 다르므로, 가장 작은 값에 맞춘다.
+const WHEEL_STEP = 40;
 // 이어지는 스크롤에서 줌을 바꾼 뒤에 다음 단계를 허용하기까지의 간격
 const ZOOM_COOLDOWN_MS = 500;
 // 스크롤 이벤트 사이의 멈춤이 이보다 길면 마우스 휠의 새로운 한 칸으로 본다.
 const WHEEL_NOTCH_PAUSE_MS = 120;
 // 스크롤이 이 시간 동안 멈추면 모아 둔 양을 버린다.
 const WHEEL_IDLE_RESET_MS = 300;
-const SEA_COLOR = '#aad3df';
+// 지도의 중심과 자선의 표시를 갱신하는 간격. 매 프레임 갱신하면 육지의 폴리곤을 다시 그리는 비용이 커진다.
+const REFRESH_INTERVAL_MS = 100;
+// 항적에 점을 추가하는 이동 거리 (m)와 보관하는 점의 최대 개수
+const TRACK_SPACING = 25;
+const MAX_TRACK_POINTS = 3000;
+// 지도를 축소했을 때 표지가 서로 겹쳐서 뭉치지 않도록, 한 픽셀이 이 거리(m)보다 넓어지면 종류별로 숨긴다.
+const HIDE_RESOLUTION = { light: 160, beacon: 40, buoy: 40 } as const;
 
-/** 아래에서 위의 순서로 겹쳐서 그리는 타일 레이어 */
-const LAYERS = [
-  // 육지, 섬, 지명, 항만 시설을 표시하는 기본 지도
-  { name: 'base', url: (z: number, x: number, y: number) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png` },
-  // 등대, 부표, 항로 표지를 표시하는 투명한 해상 표지 레이어
-  { name: 'seamark', url: (z: number, x: number, y: number) => `https://tiles.openseamap.org/seamark/${z}/${x}/${y}.png` },
-] as const;
+const MARK_COLOURS: Record<string, string> = {
+  red: '#d0242c',
+  green: '#1f9a4c',
+  yellow: '#f0bd12',
+  white: '#ffffff',
+  black: '#1c1c1c',
+  orange: '#e8742a',
+};
+const OUTLINE = new Stroke({ color: '#1b2733', width: 1 });
+
+const SHIP_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="26" viewBox="-11 -13 22 26">' +
+    '<path d="M0 -11 L7 8 L0 4 L-7 8 Z" fill="#e5352b" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/></svg>',
+)}`;
 
 /**
- * 배의 위치를 중심으로 하는 북쪽 고정 지도.
- * 표시하는 타일의 수가 적으므로 공개 타일 서버를 직접 사용하며, 한 번 받은 타일은 메모리에 보관한다.
+ * 자선을 중심으로 하는 북쪽 고정 해도. OpenLayers로 그린다.
+ *
+ * 외부의 지도 타일 서버를 조회하지 않는다. 육지는 OpenStreetMap의 해안선을 미리 가공한 폴리곤이고,
+ * 해상 표지는 3D 화면과 같은 자료이므로 두 화면의 표지가 항상 일치한다.
  */
 export class Minimap {
-  private readonly canvas = document.createElement('canvas');
-  private readonly context: CanvasRenderingContext2D;
-  private readonly tiles = new Map<string, HTMLImageElement>();
   private readonly position = document.createElement('div');
-  private zoom = DEFAULT_ZOOM;
-  private lastDrawTime = -Infinity;
+  private readonly view = new View({
+    center: fromLonLat([region.start.lon, region.start.lat]),
+    zoom: DEFAULT_ZOOM,
+    minZoom: MIN_ZOOM,
+    maxZoom: MAX_ZOOM,
+    enableRotation: false,
+  });
+  private readonly shipFeature = new Feature(new Point([0, 0]));
+  private readonly shipIcon = new Icon({ src: SHIP_ICON, rotateWithView: false });
+  private readonly track = new LineString([]);
+  private readonly markStyles = new Map<string, Style>();
+  private lastRefreshTime = -Infinity;
+  private lastTrackX = Infinity;
+  private lastTrackZ = Infinity;
   private wheelAccumulated = 0;
   private lastWheelTime = -Infinity;
   private lastZoomTime = -Infinity;
@@ -47,17 +111,121 @@ export class Minimap {
   constructor(root: HTMLElement) {
     const panel = document.createElement('div');
     panel.className = 'hud-panel hud-minimap';
+    const target = document.createElement('div');
+    target.className = 'hud-minimap-view';
+    this.position.className = 'hud-minimap-position';
+    panel.append(target, this.position);
+    root.append(panel);
 
-    const pixelRatio = Math.min(window.devicePixelRatio, 2);
-    this.canvas.width = VIEW_WIDTH * pixelRatio;
-    this.canvas.height = VIEW_HEIGHT * pixelRatio;
-    this.canvas.style.width = `${VIEW_WIDTH}px`;
-    this.canvas.style.height = `${VIEW_HEIGHT}px`;
-    this.context = this.canvas.getContext('2d')!;
-    this.context.scale(pixelRatio, pixelRatio);
-    this.canvas.dataset['zoom'] = String(this.zoom);
+    // 육지는 꼭짓점이 많아서, 그린 결과를 이미지로 보관했다가 재사용하는 레이어를 사용한다.
+    const land = new VectorImageLayer({
+      source: new VectorSource({ url: LAND_URL, format: new GeoJSON() }),
+      style: new Style({
+        fill: new Fill({ color: '#efe3c2' }),
+        stroke: new Stroke({ color: '#8f8266', width: 1 }),
+      }),
+      imageRatio: 2,
+    });
 
-    this.canvas.addEventListener(
+    const marks = new VectorSource();
+    void loadSeamarkRecords()
+      .then((records) =>
+        marks.addFeatures(
+          records.map((record) => {
+            const feature = new Feature(new Point(fromLonLat([record.lon, record.lat])));
+            feature.set('record', record);
+            return feature;
+          }),
+        ),
+      )
+      .catch((error) => console.warn('지도에 표시할 해상 표지를 불러오지 못했습니다.', error));
+
+    this.shipFeature.setStyle(new Style({ image: this.shipIcon }));
+
+    // 시가지, 방파제와 부두, 다리, 지명은 하나의 파일로 받아서 종류별 레이어에 나누어 넣는다.
+    const urban = new VectorSource();
+    const structures = new VectorSource();
+    const bridges = new VectorSource();
+    const places = new VectorSource();
+    const ring = (points: [number, number][]) => points.map((point) => fromLonLat(point));
+    void fetch(CHART_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<ChartData>;
+      })
+      .then((chart) => {
+        urban.addFeatures(chart.urban.map((points) => new Feature(new Polygon([ring(points)]))));
+        // 방파제와 부두는 면으로 등록된 것과 선으로 등록된 것이 섞여 있다.
+        structures.addFeatures(
+          chart.structures.map(
+            ({ closed, points }) => new Feature(closed ? new Polygon([ring(points)]) : new LineString(ring(points))),
+          ),
+        );
+        bridges.addFeatures(chart.bridges.map(({ points }) => new Feature(new LineString(ring(points)))));
+        places.addFeatures(
+          chart.places.map((place) => {
+            const feature = new Feature(new Point(fromLonLat([place.lon, place.lat])));
+            feature.set('place', place);
+            return feature;
+          }),
+        );
+      })
+      .catch((error) => console.warn('해도의 육지 자료를 불러오지 못했습니다.', error));
+
+    // 운영 구역의 경계. 이 선의 바깥으로는 항해할 수 없다.
+    const { south, west, north, east } = region.bounds;
+    const boundary = new Feature(
+      new Polygon([ring([[west, south], [east, south], [east, north], [west, north], [west, south]])]),
+    );
+
+    new OlMap({
+      target,
+      view: this.view,
+      layers: [
+        land,
+        new VectorLayer({ source: urban, style: new Style({ fill: new Fill({ color: '#dccba2' }) }) }),
+        // 방파제와 다리는 지도를 축소하면 점으로 뭉쳐서 보이므로, 한 픽셀이 60m보다 넓어지면 숨긴다.
+        new VectorLayer({
+          source: structures,
+          maxResolution: 60,
+          style: new Style({ fill: new Fill({ color: '#6f6a60' }), stroke: new Stroke({ color: '#6f6a60', width: 2 }) }),
+        }),
+        new VectorLayer({
+          source: bridges,
+          maxResolution: 60,
+          style: new Style({ stroke: new Stroke({ color: '#8a5a44', width: 2 }) }),
+        }),
+        new VectorLayer({
+          source: new VectorSource({ features: [boundary] }),
+          style: new Style({ stroke: new Stroke({ color: 'rgba(27, 39, 51, 0.55)', width: 1.5, lineDash: [6, 5] }) }),
+        }),
+        new VectorLayer({
+          source: new VectorSource({ features: [new Feature(this.track)] }),
+          style: new Style({ stroke: new Stroke({ color: 'rgba(229, 53, 43, 0.85)', width: 2 }) }),
+        }),
+        new VectorLayer({
+          source: marks,
+          style: (feature, resolution) => this.markStyle(feature.get('record') as SeamarkRecord, resolution),
+        }),
+        new VectorLayer({
+          source: places,
+          style: (feature, resolution) => this.placeStyle(feature.get('place') as ChartData['places'][number], resolution),
+          // 이름표가 서로 겹치면 나중에 그려지는 쪽을 생략한다.
+          declutter: true,
+        }),
+        new VectorLayer({ source: new VectorSource({ features: [this.shipFeature] }) }),
+      ],
+      controls: [
+        new ScaleLine({ units: 'metric', minWidth: 48 }),
+        new Attribution({ collapsible: false, attributions: '© OpenStreetMap contributors' }),
+      ],
+      // 지도는 항상 자선을 따라가므로 OpenLayers의 기본 조작(끌어서 옮기기 등)은 모두 끈다.
+      // 휠의 확대와 축소도 직접 처리한다. 기본 제공되는 휠 조작은 줌을 서서히 바꾸는데,
+      // 지도의 중심을 계속 자선으로 옮기는 동작과 겹치면 줌이 바뀌다가 멈추는 경우가 있었다.
+      interactions: [],
+    });
+
+    target.addEventListener(
       'wheel',
       (event) => {
         event.preventDefault();
@@ -73,122 +241,73 @@ export class Minimap {
         // 마우스 휠처럼 칸마다 멈춤이 있는 입력은 칸마다 한 단계씩 바로 반응한다.
         if (pause < WHEEL_NOTCH_PAUSE_MS && now - this.lastZoomTime < ZOOM_COOLDOWN_MS) return;
 
-        this.setZoom(this.zoom - Math.sign(this.wheelAccumulated));
+        const zoom = Math.round(this.view.getZoom() ?? DEFAULT_ZOOM) - Math.sign(this.wheelAccumulated);
+        this.view.setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)));
         this.wheelAccumulated = 0;
         this.lastZoomTime = now;
       },
       { passive: false },
     );
-
-    const attribution = document.createElement('div');
-    attribution.className = 'hud-minimap-attribution';
-    attribution.textContent = '© OpenStreetMap · OpenSeaMap';
-
-    this.position.className = 'hud-minimap-position';
-
-    // 출처 표기는 지도의 영역 위에 겹쳐서 놓는다.
-    const view = document.createElement('div');
-    view.className = 'hud-minimap-view';
-    view.append(this.canvas, attribution);
-
-    panel.append(view, this.position);
-    root.append(panel);
   }
 
   update(ship: ShipState): void {
     const now = performance.now();
-    if (now - this.lastDrawTime < REDRAW_INTERVAL_MS) return;
-    this.lastDrawTime = now;
+    if (now - this.lastRefreshTime < REFRESH_INTERVAL_MS) return;
+    this.lastRefreshTime = now;
 
-    const { context, zoom } = this;
-    const position = worldToLatLon(ship.x, ship.z);
-    this.position.textContent = `${formatAngle(position.lat, 'N', 'S')}  ${formatAngle(position.lon, 'E', 'W')}`;
-    const center = latLonToTile(position, zoom);
-    // 화면의 왼쪽 위 모서리가 전 세계를 하나의 이미지로 펼친 좌표에서 어디인지 계산한다.
-    const left = center.x * TILE_SIZE - VIEW_WIDTH / 2;
-    const top = center.y * TILE_SIZE - VIEW_HEIGHT / 2;
-    const tileCount = 2 ** zoom;
+    const { lat, lon } = worldToLatLon(ship.x, ship.z);
+    const coordinate = fromLonLat([lon, lat]);
+    this.position.textContent = `${formatAngle(lat, 'N', 'S')}  ${formatAngle(lon, 'E', 'W')}`;
 
-    context.fillStyle = SEA_COLOR;
-    context.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    this.view.setCenter(coordinate);
+    (this.shipFeature.getGeometry() as Point).setCoordinates(coordinate);
+    this.shipIcon.setRotation(ship.heading);
 
-    for (const layer of LAYERS) {
-      for (let ty = Math.floor(top / TILE_SIZE); ty * TILE_SIZE < top + VIEW_HEIGHT; ty++) {
-        for (let tx = Math.floor(left / TILE_SIZE); tx * TILE_SIZE < left + VIEW_WIDTH; tx++) {
-          if (tx < 0 || ty < 0 || tx >= tileCount || ty >= tileCount) continue;
-          const image = this.getTile(`${layer.name}/${zoom}/${tx}/${ty}`, layer.url(zoom, tx, ty));
-          if (!image.complete || image.naturalWidth === 0) continue;
-          context.drawImage(image, Math.round(tx * TILE_SIZE - left), Math.round(ty * TILE_SIZE - top));
-        }
-      }
+    if (Math.hypot(ship.x - this.lastTrackX, ship.z - this.lastTrackZ) >= TRACK_SPACING) {
+      this.lastTrackX = ship.x;
+      this.lastTrackZ = ship.z;
+      const coordinates = this.track.getCoordinates();
+      coordinates.push(coordinate);
+      if (coordinates.length > MAX_TRACK_POINTS) coordinates.shift();
+      this.track.setCoordinates(coordinates);
     }
-
-    this.drawScaleBar(metersPerTilePixel(position.lat, zoom));
-    this.drawShip(ship.heading);
   }
 
-  private setZoom(zoom: number): void {
-    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
-    this.canvas.dataset['zoom'] = String(this.zoom);
-    this.lastDrawTime = -Infinity;
+  /** 지명의 이름표. 산의 봉우리는 높이를 함께 표시한다. */
+  private placeStyle(place: ChartData['places'][number], resolution: number): Style | undefined {
+    const { font, color, maxResolution } = PLACE_STYLES[place.kind];
+    if (resolution > maxResolution) return undefined;
+    return new Style({
+      text: new Text({
+        text: place.kind === 'peak' && place.ele ? `▲ ${place.name} ${place.ele}` : place.name,
+        font: `${font} ${LABEL_FONT_FAMILY}`,
+        fill: new Fill({ color }),
+        stroke: LABEL_HALO,
+        overflow: true,
+      }),
+    });
   }
 
-  private getTile(key: string, url: string): HTMLImageElement {
-    let image = this.tiles.get(key);
-    if (!image) {
-      image = new Image();
-      image.addEventListener('load', () => (this.lastDrawTime = -Infinity));
-      image.src = url;
-      this.tiles.set(key, image);
-      // Map은 삽입한 순서를 유지하므로 첫 번째 항목이 가장 오래된 타일이다.
-      if (this.tiles.size > MAX_CACHED_TILES) this.tiles.delete(this.tiles.keys().next().value!);
+  /** 표지의 종류와 색상에 따른 기호. 같은 기호는 한 번만 만들어서 재사용한다. */
+  private markStyle(record: SeamarkRecord, resolution: number): Style | undefined {
+    if (resolution > HIDE_RESOLUTION[record.kind]) return undefined;
+
+    // 등대는 구조물의 색상이 기록되어 있지 않은 경우가 많아서 등화의 색상으로 구분한다.
+    const colour = MARK_COLOURS[(record.kind === 'light' ? record.light : record.colour) ?? 'white'] ?? '#ffffff';
+    const key = `${record.kind}/${colour}`;
+    let style = this.markStyles.get(key);
+    if (!style) {
+      const fill = new Fill({ color: colour });
+      const image =
+        record.kind === 'light'
+          ? new RegularShape({ points: 5, radius: 5.5, radius2: 2.4, fill, stroke: OUTLINE })
+          : record.kind === 'beacon'
+            ? new RegularShape({ points: 4, radius: 4, angle: Math.PI / 4, fill, stroke: OUTLINE })
+            : new CircleStyle({ radius: 3, fill, stroke: OUTLINE });
+      style = new Style({ image });
+      this.markStyles.set(key, style);
     }
-    return image;
-  }
-
-  private drawShip(heading: number): void {
-    const { context } = this;
-    context.save();
-    context.translate(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
-    context.rotate(heading);
-    context.beginPath();
-    context.moveTo(0, -11);
-    context.lineTo(7, 8);
-    context.lineTo(0, 4);
-    context.lineTo(-7, 8);
-    context.closePath();
-    context.fillStyle = '#e5352b';
-    context.strokeStyle = '#ffffff';
-    context.lineWidth = 2;
-    context.lineJoin = 'round';
-    context.stroke();
-    context.fill();
-    context.restore();
-  }
-
-  private drawScaleBar(metersPerPixel: number): void {
-    const { context } = this;
-    // 길이가 80픽셀을 넘지 않는 범위에서 1, 2, 5로 시작하는 가장 큰 거리를 고른다.
-    const maxMeters = metersPerPixel * 80;
-    const magnitude = 10 ** Math.floor(Math.log10(maxMeters));
-    const meters = [5, 2, 1].map((step) => step * magnitude).find((value) => value <= maxMeters)!;
-    const width = meters / metersPerPixel;
-    const x = 10;
-    const y = VIEW_HEIGHT - 12;
-
-    context.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    context.fillRect(x - 4, y - 16, width + 8, 22);
-    context.strokeStyle = '#1b2733';
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(x, y - 5);
-    context.lineTo(x, y);
-    context.lineTo(x + width, y);
-    context.lineTo(x + width, y - 5);
-    context.stroke();
-    context.fillStyle = '#1b2733';
-    context.font = '11px ui-monospace, Menlo, monospace';
-    context.fillText(meters >= 1000 ? `${meters / 1000} km` : `${meters} m`, x + 4, y - 5);
+    return style;
   }
 }
 

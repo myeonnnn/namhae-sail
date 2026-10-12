@@ -1,0 +1,15 @@
+{
+  "name": "통영~거제 (한려수도)",
+  "bounds": {
+    "south": 34.55,
+    "west": 128.2,
+    "north": 34.98,
+    "east": 128.8
+  },
+  "start": {
+    "lat": 34.79,
+    "lon": 128.445,
+    "headingDeg": 0
+  },
+  "dataMargin": 0.06
+}

@@ -1,14 +1,17 @@
-// OpenStreetMap에서 남해 범위의 등대, 등표, 부표를 내려받아서 public/data/seamarks.json으로 저장한다.
+// OpenStreetMap에서 운영 구역(src/geo/region.json)의 등대, 등표, 부표를 내려받아서 public/data/seamarks.json으로 저장한다.
 // 실행: node scripts/fetch-seamarks.mjs
 // 자료의 라이선스는 ODbL이며, 화면에 "© OpenStreetMap contributors"를 표기해야 한다.
 // Overpass API는 공용 서버이므로 실행 중에 요청하지 않고, 이 스크립트로 한 번만 받아서 정적 파일로 사용한다.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../public/data/seamarks.json');
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const OUT = resolve(ROOT, 'public/data/seamarks.json');
+const { bounds: REGION, dataMargin: MARGIN } = JSON.parse(readFileSync(resolve(ROOT, 'src/geo/region.json'), 'utf8'));
+// 구역의 경계 바로 바깥에 있는 표지도 화면에 보이므로, region.json의 dataMargin만큼 넓게 받는다.
 // 남, 서, 북, 동의 순서
-const BOUNDS = [33.0, 125.0, 35.5, 129.5];
+const BOUNDS = [REGION.south - MARGIN, REGION.west - MARGIN, REGION.north + MARGIN, REGION.east + MARGIN];
 // 공용 서버는 혼잡할 때 요청을 거절하므로, 순서대로 시도한다.
 const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',

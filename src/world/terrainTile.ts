@@ -34,6 +34,83 @@ export function decodeTerrarium(pixels: Uint8ClampedArray): Float32Array {
   return heights;
 }
 
+// 한 픽셀이 주변 여덟 픽셀의 중앙값보다 이만큼(m) 높으면 자료의 오류로 보고 중앙값으로 바꾼다.
+// 한 픽셀이 약 31m이므로, 실제 지형에서 이런 솟음이 나오려면 사방이 60°에 가까운 절벽이어야 한다.
+const SPIKE_THRESHOLD = 50;
+// 해안선 자료가 육지라고 판정했는데 표고가 수면 이하인 곳에 주는 높이 (m). 표고 자료에 빠져 있는 작은 섬이 여기에 해당한다.
+const MIN_LAND_HEIGHT = 1.5;
+// 해안선 자료의 범위 밖에서, 서로 붙어 있는 육지 픽셀이 이 개수 이하이고 낮으면 바다 위의 잡음으로 보고 지운다.
+const SPECK_MAX_PIXELS = 12;
+const SPECK_MAX_HEIGHT = 10;
+const SEA_HEIGHT = -1;
+
+/**
+ * 표고 자료의 오류를 정리한다. heights를 직접 수정한다.
+ * mask는 LandMask.rasterize의 결과이며(1 육지, 0 바다, 255 범위 밖), 없으면 표고만으로 판정한다.
+ */
+export function cleanHeights(heights: Float32Array, mask?: Uint8Array): void {
+  const size = TILE_PIXELS;
+
+  // 1. 한두 픽셀이 수백 미터씩 솟은 값을 제거한다. 두 픽셀이 붙어 있는 경우를 위해서 두 번 반복한다.
+  const neighbours = new Float32Array(8);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 1; y < size - 1; y++) {
+      for (let x = 1; x < size - 1; x++) {
+        const index = y * size + x;
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx !== 0 || dy !== 0) neighbours[n++] = heights[index + dy * size + dx];
+          }
+        }
+        neighbours.sort();
+        const median = (neighbours[3] + neighbours[4]) / 2;
+        if (heights[index] - median > SPIKE_THRESHOLD) heights[index] = median;
+      }
+    }
+  }
+
+  // 2. 해안선 자료가 있는 곳에서는 그 판정을 따른다.
+  if (mask) {
+    for (let i = 0; i < heights.length; i++) {
+      if (mask[i] === 1) heights[i] = Math.max(heights[i], MIN_LAND_HEIGHT);
+      else if (mask[i] === 0) heights[i] = Math.min(heights[i], SEA_HEIGHT);
+    }
+  }
+
+  // 3. 해안선 자료가 없는 곳에서는, 바다 위에 흩어진 작고 낮은 조각을 지운다.
+  const visited = new Uint8Array(heights.length);
+  const stack: number[] = [];
+  const members: number[] = [];
+  for (let start = 0; start < heights.length; start++) {
+    if (visited[start] || heights[start] < SEA_LEVEL_THRESHOLD || (mask && mask[start] !== 255)) continue;
+    members.length = 0;
+    let highest = 0;
+    stack.push(start);
+    visited[start] = 1;
+    while (stack.length) {
+      const index = stack.pop()!;
+      members.push(index);
+      highest = Math.max(highest, heights[index]);
+      const x = index % size;
+      const y = (index - x) / size;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+        const next = ny * size + nx;
+        if (!visited[next] && heights[next] >= SEA_LEVEL_THRESHOLD) {
+          visited[next] = 1;
+          stack.push(next);
+        }
+      }
+    }
+    if (members.length <= SPECK_MAX_PIXELS && highest < SPECK_MAX_HEIGHT) {
+      for (const index of members) heights[index] = SEA_HEIGHT;
+    }
+  }
+}
+
 export interface TerrainSurface {
   geometry: THREE.BufferGeometry;
   /** 메시의 각 정점의 높이 (m). 수면이 0이며, 한 변의 정점 수는 TERRAIN_SEGMENTS + 1이다. */
