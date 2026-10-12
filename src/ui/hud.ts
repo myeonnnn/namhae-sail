@@ -1,3 +1,4 @@
+import { worldToLatLon } from '../geo/projection';
 import type { ShipControls, ShipState } from '../ship/shipPhysics';
 
 const MS_TO_KNOTS = 1.943844;
@@ -47,7 +48,15 @@ export class Hud {
     fields.throttle.textContent = `${(controls.throttle * 100).toFixed(0)} %`;
     fields.rudder.textContent =
       Math.abs(rudderDeg) < 0.5 ? '중앙' : `${rudderDeg > 0 ? '우현' : '좌현'} ${Math.abs(rudderDeg).toFixed(0)}°`;
-    // -Z가 북쪽이므로 북쪽 거리는 z의 부호를 뒤집어서 표시한다.
-    fields.position.textContent = `E ${state.x.toFixed(0)} m / N ${(-state.z).toFixed(0)} m`;
+    const { lat, lon } = worldToLatLon(state.x, state.z);
+    fields.position.textContent = `${formatAngle(lat, 'N', 'S')} ${formatAngle(lon, 'E', 'W')}`;
   }
+}
+
+/** 해도에서 사용하는 도와 분의 형식으로 표시한다. 위도 1분은 1해리(1852m)에 해당한다. */
+function formatAngle(value: number, positive: string, negative: string): string {
+  const absolute = Math.abs(value);
+  const degrees = Math.floor(absolute);
+  const minutes = (absolute - degrees) * 60;
+  return `${degrees}°${minutes.toFixed(3).padStart(6, '0')}′${value >= 0 ? positive : negative}`;
 }

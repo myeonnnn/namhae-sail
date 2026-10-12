@@ -9,6 +9,7 @@ import { Ship } from './ship/ship';
 import { OCEAN_LINER } from './ship/shipSpec';
 import { AxisGizmo } from './ui/axisGizmo';
 import { Hud } from './ui/hud';
+import { Minimap } from './ui/minimap';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
 const { renderer, scene, camera } = createStage(canvas);
@@ -23,6 +24,7 @@ const chaseCamera = new ChaseCamera(camera, canvas, OCEAN_LINER.camera);
 const hudRoot = document.querySelector<HTMLElement>('#hud')!;
 const hud = new Hud(hudRoot);
 const axisGizmo = new AxisGizmo(hudRoot);
+const minimap = new Minimap(hudRoot);
 
 startLoop({
   update(dt) {
@@ -36,6 +38,7 @@ startLoop({
     ocean.update(elapsed, ship.state.x, ship.state.z, camera, canvas.clientHeight);
     hud.update(ship.state, ship.controls);
     axisGizmo.update(camera, ship.state);
+    minimap.update(ship.state);
     renderer.render(scene, camera);
   },
 });

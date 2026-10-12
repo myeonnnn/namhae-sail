@@ -72,3 +72,44 @@ body {
 .hud-gizmo-legend span {
   font-weight: 700;
 }
+
+.hud-minimap {
+  top: 16px;
+  left: 16px;
+  padding: 6px;
+  pointer-events: auto;
+}
+
+.hud-minimap canvas {
+  display: block;
+  border-radius: 4px;
+}
+
+.hud-minimap-zoom {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-minimap-zoom button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(27, 39, 51, 0.35);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1b2733;
+  font: 700 16px/1 ui-monospace, Menlo, monospace;
+  cursor: pointer;
+}
+
+.hud-minimap-attribution {
+  max-width: 280px;
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+  text-align: right;
+}
