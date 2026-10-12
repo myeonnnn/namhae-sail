@@ -47,6 +47,9 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uScatterColor;
   uniform samplerCube uSky;
   uniform sampler2D uDetailNormals;
+  uniform sampler2D uWakeMap;
+  uniform vec2 uWakeCenter;
+  uniform float uWakeHalfExtent;
 
   varying vec2 vBasePosition;
   varying vec3 vWorldPosition;
@@ -94,6 +97,13 @@ const fragmentShader = /* glsl */ `
     float crest = smoothstep(-0.3, 2.2, vWorldPosition.y);
     vec3 body = uDeepColor * (0.55 + 0.9 * sunFacing) + uScatterColor * crest;
 
+    // 항적 지도에서 이 지점의 물거품 세기를 읽는다. 지도의 범위 밖은 0으로 취급한다.
+    vec2 wakeUv = (vWorldPosition.xz - uWakeCenter) / (2.0 * uWakeHalfExtent) + 0.5;
+    vec2 wakeInside = step(vec2(0.0), wakeUv) * step(wakeUv, vec2(1.0));
+    float wake = texture2D(uWakeMap, wakeUv).r * wakeInside.x * wakeInside.y;
+    // 공기 방울이 섞인 물은 밝은 청록색으로 보인다.
+    body += uScatterColor * wake * 1.6;
+
     vec3 halfVector = normalize(viewDirection + uSunDirection);
     float sunGlint = pow(max(dot(normal, halfVector), 0.0), 500.0);
 
@@ -103,6 +113,11 @@ const fragmentShader = /* glsl */ `
     float foamNoise = rippleMedium.x * rippleSmall.y + 0.5 * rippleLarge.y;
     float foam = smoothstep(0.3, 0.46, pinch + 0.12 * foamNoise) * rippleFade;
     foam *= smoothstep(-0.15, 0.25, rippleSmall.x + rippleMedium.y);
+
+    // 항적의 물거품은 세기가 약해질수록 잔물결의 무늬를 따라 듬성듬성하게 끊어진다.
+    float wakeNoise = 0.5 + 0.5 * clamp(rippleMedium.x * 0.7 + rippleSmall.y * 0.7 + rippleLarge.x * 0.4, -1.0, 1.0);
+    float wakeFoam = smoothstep(1.0 - wake, 1.35 - wake, wakeNoise) * step(0.01, wake);
+    foam = max(foam, wakeFoam);
     color = mix(color, vec3(0.85, 0.9, 0.92) * (0.5 + 0.6 * sunFacing), foam * 0.75);
 
     // 먼 수면을 그 방향의 수평선 색상으로 수렴시켜서 바다의 끝과 하늘의 경계를 감춘다.
@@ -119,10 +134,16 @@ const fragmentShader = /* glsl */ `
 export interface OceanMaterialOptions {
   sky: THREE.CubeTexture;
   detailNormals: THREE.Texture;
+  wake: { texture: THREE.Texture; center: THREE.Vector2; halfExtent: number };
   sunDirection: THREE.Vector3;
 }
 
-export function createOceanMaterial({ sky, detailNormals, sunDirection }: OceanMaterialOptions): THREE.ShaderMaterial {
+export function createOceanMaterial({
+  sky,
+  detailNormals,
+  sunDirection,
+  wake,
+}: OceanMaterialOptions): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     defines: { WAVE_COUNT: WAVES.length },
     uniforms: {
@@ -136,6 +157,9 @@ export function createOceanMaterial({ sky, detailNormals, sunDirection }: OceanM
       uScatterColor: { value: new THREE.Color(0.0, 0.09, 0.085) },
       uSky: { value: sky },
       uDetailNormals: { value: detailNormals },
+      uWakeMap: { value: wake.texture },
+      uWakeCenter: { value: wake.center },
+      uWakeHalfExtent: { value: wake.halfExtent },
     },
     vertexShader,
     fragmentShader,

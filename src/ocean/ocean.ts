@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { createOceanGeometry, OCEAN_CELL_SIZE } from './oceanGeometry';
 import { createOceanMaterial } from './oceanMaterial';
+import type { Wake } from './wake';
 import { createWaterNormals } from './waterNormals';
 
 const SUN_ELEVATION_DEG = 20;
@@ -14,7 +15,7 @@ export class Ocean {
   private readonly surface: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   private readonly sky = new Sky();
 
-  constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+  constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, wake: Wake) {
     this.sunDirection.setFromSphericalCoords(
       1,
       THREE.MathUtils.degToRad(90 - SUN_ELEVATION_DEG),
@@ -56,6 +57,7 @@ export class Ocean {
         sky: skyCube.texture,
         detailNormals: createWaterNormals(),
         sunDirection: this.sunDirection,
+        wake,
       }),
     );
     // 정점을 셰이더에서 이동시키므로 Three.js가 계산한 경계 상자로는 화면 밖 여부를 판정할 수 없다.
