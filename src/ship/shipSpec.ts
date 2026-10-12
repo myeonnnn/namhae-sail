@@ -23,6 +23,11 @@ export interface ShipSpec {
     propWashGain: number;
     yawLinearDrag: number;
     yawQuadraticDrag: number;
+    /** 선체가 받는 바람의 세기 (m/s)의 제곱에 곱해서 각 방향의 가속도를 구하는 계수 */
+    windSurge: number;
+    windSway: number;
+    /** 옆바람이 선수를 바람이 불어 가는 쪽으로 돌리는 정도 */
+    windYaw: number;
   };
   controls: {
     /** 스로틀 레버가 초당 움직이는 양 */
@@ -71,6 +76,10 @@ export const OCEAN_LINER: ShipSpec = {
     propWashGain: 0.008,
     yawLinearDrag: 0.5,
     yawQuadraticDrag: 1.0,
+    // 초속 15m의 옆바람에서 약 0.8m/s(1.5노트)로 밀리는 값이다.
+    windSurge: 0.0006,
+    windSway: 0.0028,
+    windYaw: 0.00001,
   },
   controls: {
     throttleRate: 0.8,

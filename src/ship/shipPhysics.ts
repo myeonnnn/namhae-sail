@@ -30,8 +30,24 @@ export function createShipState(): ShipState {
   return { x: 0, z: 0, heading: 0, surge: 0, sway: 0, yawRate: 0 };
 }
 
-export function stepShip(state: ShipState, controls: ShipControls, p: ShipSpec['physics'], dt: number): void {
+export function stepShip(
+  state: ShipState,
+  controls: ShipControls,
+  p: ShipSpec['physics'],
+  /** 바람이 공기를 이동시키는 속도 (월드 좌표, m/s) */
+  wind: { x: number; z: number },
+  dt: number,
+): void {
   const { surge, sway, yawRate } = state;
+  const headingSin = Math.sin(state.heading);
+  const headingCos = Math.cos(state.heading);
+
+  // 선체가 실제로 받는 바람은 바람의 속도에서 배의 속도를 뺀 값이다.
+  // 월드 기준의 바람을 선체 기준(선수 방향, 우현 방향)으로 변환한 다음에 배의 속도를 뺀다.
+  const apparentForward = wind.x * headingSin - wind.z * headingCos - surge;
+  const apparentStarboard = wind.x * headingCos + wind.z * headingSin - sway;
+  // 풍압은 풍속의 제곱에 비례한다.
+  const apparentSpeed = Math.hypot(apparentForward, apparentStarboard);
 
   const thrust =
     controls.throttle >= 0
@@ -39,14 +55,19 @@ export function stepShip(state: ShipState, controls: ShipControls, p: ShipSpec['
       : controls.throttle * p.thrustAccel * p.reverseThrustRatio;
 
   const surgeAccel =
-    thrust - p.surgeLinearDrag * surge - p.surgeQuadraticDrag * Math.abs(surge) * surge + sway * yawRate;
+    thrust -
+    p.surgeLinearDrag * surge -
+    p.surgeQuadraticDrag * Math.abs(surge) * surge +
+    sway * yawRate +
+    p.windSurge * apparentForward * apparentSpeed;
   // -surge * yawRate 항 때문에 선회할 때 선체가 바깥쪽으로 밀린다.
-  const swayAccel = -p.swayDrag * sway - surge * yawRate;
+  const swayAccel = -p.swayDrag * sway - surge * yawRate + p.windSway * apparentStarboard * apparentSpeed;
   // 타는 물의 흐름이 있어야 효과가 있으므로 속도에 비례하고, 프로펠러 후류가 저속에서의 타효를 보탠다.
   const yawAccel =
     controls.rudder * (p.rudderGain * surge + p.propWashGain * controls.throttle) -
     p.yawLinearDrag * yawRate -
-    p.yawQuadraticDrag * Math.abs(yawRate) * yawRate;
+    p.yawQuadraticDrag * Math.abs(yawRate) * yawRate +
+    p.windYaw * apparentStarboard * apparentSpeed;
 
   state.surge += surgeAccel * dt;
   state.sway += swayAccel * dt;

@@ -42,6 +42,7 @@ const fragmentShader = /* glsl */ `
   // 픽셀 하나가 차지하는 시야각 (rad)
   uniform float uPixelAngle;
   uniform float uHazeDistance;
+  uniform float uRippleStrength;
   uniform vec3 uSunDirection;
   uniform vec3 uSunColor;
   uniform vec3 uDeepColor;
@@ -81,7 +82,7 @@ const fragmentShader = /* glsl */ `
     vec2 rippleMedium = texture2D(uDetailNormals, vBasePosition / 23.0 + uTime * vec2(-0.011, 0.008)).xy * 2.0 - 1.0;
     vec2 rippleSmall = texture2D(uDetailNormals, vBasePosition / 7.3 + uTime * vec2(0.017, -0.021)).xy * 2.0 - 1.0;
     float rippleFade = 1.0 - smoothstep(300.0, 4000.0, cameraDistance);
-    vec2 ripple = (rippleLarge * 0.22 + rippleMedium * 0.16 + rippleSmall * 0.1) * rippleFade;
+    vec2 ripple = (rippleLarge * 0.22 + rippleMedium * 0.16 + rippleSmall * 0.1) * rippleFade * uRippleStrength;
 
     vec3 normal = normalize(vec3(-slope.x - ripple.x, 1.0 - pinch, -slope.y - ripple.y));
 
@@ -155,6 +156,7 @@ export function createOceanMaterial({
       uWaveMotion: { value: WAVES.map((w) => new THREE.Vector4(w.omega, w.q, w.wavelength, 0)) },
       uPixelAngle: { value: 0.0015 },
       uHazeDistance: { value: hazeDistance },
+      uRippleStrength: { value: 1 },
       uSunDirection: { value: sunDirection },
       uSunColor: { value: new THREE.Color(1.0, 0.86, 0.66).multiplyScalar(30) },
       uDeepColor: { value: new THREE.Color(0.004, 0.034, 0.062) },

@@ -35,7 +35,7 @@ export class Ship {
     void this.loadModel();
   }
 
-  update(dt: number, input: Input): void {
+  update(dt: number, input: Input, wind: { x: number; z: number }): void {
     const { controls, spec } = this;
 
     // 스로틀은 레버처럼 놓은 위치에 머무르고, 타는 키를 놓으면 중앙으로 복귀한다.
@@ -53,7 +53,7 @@ export class Ship {
     this.previousX = this.state.x;
     this.previousZ = this.state.z;
     this.previousHeading = this.state.heading;
-    stepShip(this.state, controls, spec.physics, dt);
+    stepShip(this.state, controls, spec.physics, wind, dt);
   }
 
   /**

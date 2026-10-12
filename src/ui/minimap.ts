@@ -1,7 +1,8 @@
 import { latLonToTile, metersPerTilePixel, worldToLatLon } from '../geo/projection';
 import type { ShipState } from '../ship/shipPhysics';
 
-const VIEW_SIZE = 280;
+// 계기판의 높이에 맞춘 크기이다. 계기판의 구성을 바꾸면 함께 조정한다.
+const VIEW_SIZE = 177;
 const TILE_SIZE = 256;
 const MIN_ZOOM = 7;
 const MAX_ZOOM = 16;
@@ -26,6 +27,7 @@ export class Minimap {
   private readonly canvas = document.createElement('canvas');
   private readonly context: CanvasRenderingContext2D;
   private readonly tiles = new Map<string, HTMLImageElement>();
+  private readonly position = document.createElement('div');
   private zoom = DEFAULT_ZOOM;
   private lastDrawTime = -Infinity;
 
@@ -56,9 +58,11 @@ export class Minimap {
 
     const attribution = document.createElement('div');
     attribution.className = 'hud-minimap-attribution';
-    attribution.textContent = '© OpenStreetMap contributors · OpenSeaMap · 표고: Mapzen, SRTM';
+    attribution.innerHTML = '© OpenStreetMap contributors<br />OpenSeaMap · 표고: Mapzen, SRTM';
 
-    panel.append(this.canvas, controls, attribution);
+    this.position.className = 'hud-minimap-position';
+
+    panel.append(this.canvas, controls, this.position, attribution);
     root.append(panel);
   }
 
@@ -69,6 +73,7 @@ export class Minimap {
 
     const { context, zoom } = this;
     const position = worldToLatLon(ship.x, ship.z);
+    this.position.textContent = `${formatAngle(position.lat, 'N', 'S')}  ${formatAngle(position.lon, 'E', 'W')}`;
     const center = latLonToTile(position, zoom);
     // 화면의 왼쪽 위 모서리가 전 세계를 하나의 이미지로 펼친 좌표에서 어디인지 계산한다.
     const left = center.x * TILE_SIZE - VIEW_SIZE / 2;
@@ -168,4 +173,12 @@ export class Minimap {
     context.font = '11px ui-monospace, Menlo, monospace';
     context.fillText(meters >= 1000 ? `${meters / 1000} km` : `${meters} m`, x + 4, y - 5);
   }
+}
+
+/** 해도에서 사용하는 도와 분의 형식으로 표시한다. 위도 1분은 1해리(1852m)에 해당한다. */
+function formatAngle(value: number, positive: string, negative: string): string {
+  const absolute = Math.abs(value);
+  const degrees = Math.floor(absolute);
+  const minutes = (absolute - degrees) * 60;
+  return `${degrees}°${minutes.toFixed(3).padStart(6, '0')}′${value >= 0 ? positive : negative}`;
 }

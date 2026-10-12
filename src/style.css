@@ -1,10 +1,25 @@
+:root {
+  --hud-gap: 10px;
+  --hud-margin: 16px;
+  --hud-surface: rgba(8, 20, 34, 0.6);
+  --hud-border: rgba(232, 241, 248, 0.18);
+  --hud-track: rgba(232, 241, 248, 0.14);
+  --hud-text: #e8f1f8;
+  --hud-text-muted: rgba(232, 241, 248, 0.62);
+  --hud-ahead: #7fd0ff;
+  --hud-astern: #ffb45c;
+  --hud-port: #ff6b6b;
+  --hud-starboard: #5fd38a;
+  --hud-font: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --hud-font-number: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
   background: #0b1a2a;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 #scene {
@@ -18,64 +33,99 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  color: #e8f1f8;
-  font-size: 13px;
+  color: var(--hud-text);
+  font: 12px/1.4 var(--hud-font);
+}
+
+#hud [hidden] {
+  display: none;
+}
+
+.hud-column {
+  position: absolute;
+  top: var(--hud-margin);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-gap);
+}
+
+.hud-column-right {
+  right: var(--hud-margin);
+  align-items: flex-end;
+}
+
+/* 지도와 계기판을 하나의 조작대처럼 붙여서 화면의 아래쪽 가운데에 둔다. */
+.hud-bottom {
+  position: absolute;
+  bottom: var(--hud-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+}
+
+.hud-bottom .hud-panel:first-child {
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+}
+
+.hud-bottom .hud-panel:last-child {
+  border-radius: 0 8px 8px 0;
 }
 
 .hud-panel {
-  position: absolute;
-  padding: 10px 14px;
-  background: rgba(8, 20, 34, 0.55);
-  border: 1px solid rgba(232, 241, 248, 0.18);
+  padding: 10px 12px;
+  background: var(--hud-surface);
+  border: 1px solid var(--hud-border);
   border-radius: 8px;
   backdrop-filter: blur(6px);
 }
 
-.hud-status {
-  left: 16px;
-  bottom: 16px;
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 4px 16px;
+.hud-label {
+  color: var(--hud-text-muted);
+  font-size: 11px;
 }
 
-.hud-status dt {
-  opacity: 0.65;
-}
-
-.hud-status dd {
-  margin: 0;
-  text-align: right;
+.hud-value {
+  font-family: var(--hud-font-number);
   font-variant-numeric: tabular-nums;
 }
 
-.hud-help {
-  right: 16px;
-  bottom: 16px;
-  line-height: 1.6;
-  opacity: 0.85;
+#hud button {
+  padding: 3px 8px;
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  background: rgba(232, 241, 248, 0.1);
+  color: var(--hud-text);
+  font: inherit;
+  cursor: pointer;
 }
 
-.hud-gizmo {
-  top: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+#hud button:hover {
+  background: rgba(232, 241, 248, 0.2);
 }
 
-.hud-gizmo-legend {
-  line-height: 1.6;
-  font-size: 12px;
+#hud .hud-icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 
-.hud-gizmo-legend span {
-  font-weight: 700;
+/* 패널이 펼쳐져 있는 동안에는 버튼을 눌린 상태로 표시한다. */
+#hud .hud-icon-button[aria-expanded='true'] {
+  background: var(--hud-ahead);
+  border-color: var(--hud-ahead);
+  color: #0b1a2a;
 }
+
+/* 지도 */
 
 .hud-minimap {
-  top: 16px;
-  left: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   padding: 6px;
   pointer-events: auto;
 }
@@ -87,29 +137,316 @@ body {
 
 .hud-minimap-zoom {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.hud-minimap-zoom button {
-  width: 26px;
-  height: 26px;
+#hud .hud-minimap-zoom button {
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: 1px solid rgba(27, 39, 51, 0.35);
-  border-radius: 4px;
+  border-color: rgba(27, 39, 51, 0.35);
   background: rgba(255, 255, 255, 0.9);
   color: #1b2733;
-  font: 700 16px/1 ui-monospace, Menlo, monospace;
-  cursor: pointer;
+  font: 700 15px/1 var(--hud-font-number);
+}
+
+.hud-minimap-position {
+  margin-top: auto;
+  padding-top: 5px;
+  font-family: var(--hud-font-number);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: pre;
 }
 
 .hud-minimap-attribution {
-  max-width: 280px;
+  margin-top: 2px;
+  color: var(--hud-text-muted);
+  font-size: 9px;
+  text-align: center;
+}
+
+/* 계기판 */
+
+.hud-instruments {
+  display: grid;
+  align-content: space-between;
+  gap: 10px;
+}
+
+.hud-gauges {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-throttle {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.hud-throttle-track {
+  position: relative;
+  width: 14px;
+  height: 78px;
+  background: var(--hud-track);
+  border-radius: 4px;
+}
+
+/* 중립 위치를 표시하는 가로선 */
+.hud-throttle-track::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  border-top: 1px solid var(--hud-text);
+}
+
+.hud-throttle-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 4px;
+  background: var(--hud-ahead);
+}
+
+.hud-throttle-fill[data-direction='astern'] {
+  background: var(--hud-astern);
+}
+
+.hud-speed {
+  font: 500 36px/1.1 var(--hud-font-number);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-speed small {
+  margin-left: 4px;
+  color: var(--hud-text-muted);
+  font-size: 12px;
+}
+
+.hud-bearing-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   margin-top: 4px;
-  font-size: 10px;
-  opacity: 0.75;
-  text-align: right;
+  text-align: center;
+}
+
+.hud-bearing-values .hud-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 나침반의 이동 방향 화살표와 같은 색상으로 표시해서, 같은 값이라는 것을 알린다. */
+.hud-bearing-course .hud-value {
+  color: #ffd24a;
+}
+
+.hud-compass {
+  display: block;
+}
+
+.hud-rudder-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.hud-rudder-track {
+  position: relative;
+  height: 10px;
+  margin-top: 4px;
+  background: var(--hud-track);
+  border-radius: 4px;
+}
+
+/* 타의 중앙 위치를 표시하는 세로선 */
+.hud-rudder-track::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  border-left: 1px solid var(--hud-text);
+}
+
+.hud-rudder-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--hud-starboard);
+}
+
+.hud-rudder-fill[data-side='port'] {
+  background: var(--hud-port);
+}
+
+/* 계기판 아래쪽의 기본 조작키 안내 */
+.hud-key-hints {
+  display: flex;
+  justify-content: space-between;
+  color: var(--hud-text-muted);
+  font-size: 11px;
+}
+
+.hud-key-hints kbd {
+  margin-right: 3px;
+}
+
+.hud-key-hints kbd:last-of-type {
+  margin-right: 5px;
+}
+
+/* 설정 메뉴 */
+
+.hud-settings {
+  position: absolute;
+  top: var(--hud-margin);
+  left: var(--hud-margin);
+  pointer-events: auto;
+}
+
+#hud .hud-settings-button {
+  width: 34px;
+  height: 34px;
+  background: var(--hud-surface);
+  backdrop-filter: blur(6px);
+}
+
+.hud-settings-dropdown {
+  min-width: 220px;
+  margin-top: 6px;
+  padding: 4px;
+}
+
+.hud-settings-section + .hud-settings-section {
+  border-top: 1px solid var(--hud-border);
+}
+
+#hud .hud-settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+#hud .hud-settings-header:hover {
+  background: rgba(232, 241, 248, 0.1);
+}
+
+/* 구역이 펼쳐져 있으면 위쪽을, 접혀 있으면 아래쪽을 가리키는 화살표 */
+.hud-settings-header::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  opacity: 0.7;
+}
+
+.hud-settings-header[aria-expanded='true']::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.hud-settings-content {
+  padding: 2px 10px 10px;
+}
+
+.hud-keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.hud-keys dt {
+  display: flex;
+  gap: 3px;
+}
+
+.hud-keys dd {
+  margin: 0;
+  color: var(--hud-text-muted);
+}
+
+.hud-keys kbd,
+.hud-key-hints kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 1px 5px;
+  border: 1px solid var(--hud-border);
+  border-radius: 3px;
+  background: rgba(232, 241, 248, 0.1);
+  color: var(--hud-text);
+  font: 11px/1.5 var(--hud-font-number);
+  text-align: center;
+}
+
+/* 환경 */
+
+.hud-environment {
+  pointer-events: auto;
+}
+
+.hud-environment-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hud-environment-wind {
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-environment-controls {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hud-border);
+}
+
+.hud-environment-controls label {
+  display: grid;
+  grid-template-columns: 2.5em 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-environment-controls input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--hud-ahead);
+}
+
+/* 경고 */
+
+.hud-alert {
+  position: absolute;
+  top: var(--hud-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  background: rgba(120, 22, 22, 0.82);
+  border: 1px solid rgba(255, 140, 140, 0.6);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }

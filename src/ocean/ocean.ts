@@ -3,6 +3,8 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { createOceanGeometry, OCEAN_CELL_SIZE } from './oceanGeometry';
 import { createOceanMaterial } from './oceanMaterial';
 import type { Wake } from './wake';
+import { WAVES } from './waves';
+import type { Wind } from '../environment/wind';
 import { createWaterNormals } from './waterNormals';
 
 const SUN_ELEVATION_DEG = 20;
@@ -78,8 +80,22 @@ export class Ocean {
   }
 
   /** elapsed는 부력 계산과 동일한 시계여야 화면의 파도와 배의 움직임이 일치한다. */
-  update(elapsed: number, focusX: number, focusZ: number, camera: THREE.PerspectiveCamera, viewportHeight: number): void {
+  update(
+    elapsed: number,
+    focusX: number,
+    focusZ: number,
+    camera: THREE.PerspectiveCamera,
+    viewportHeight: number,
+    wind: Wind,
+  ): void {
     const { uniforms } = this.surface.material;
+    // 바람에 따라 갱신된 파도의 목록을 셰이더에 전달한다.
+    WAVES.forEach((wave, i) => {
+      (uniforms['uWaveShape'].value as THREE.Vector4[])[i].set(wave.dirX, wave.dirZ, wave.k, wave.amplitude);
+      (uniforms['uWaveMotion'].value as THREE.Vector4[])[i].set(wave.omega, wave.q, wave.wavelength, 0);
+    });
+    // 바람이 없으면 잔물결이 사라져서 수면이 거울처럼 매끄러워진다.
+    uniforms['uRippleStrength'].value = 0.15 + 0.85 * THREE.MathUtils.smoothstep(wind.speed, 0, 9);
     uniforms['uTime'].value = elapsed;
     uniforms['uPixelAngle'].value = THREE.MathUtils.degToRad(camera.fov) / viewportHeight;
     // 파도는 월드 좌표를 기준으로 계산되므로 격자를 옮겨도 파도가 따라 움직이지 않는다.
