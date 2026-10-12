@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { latLonToWorld } from '../geo/projection';
-import region from '../geo/region.json';
+import { REGION_CENTER } from '../geo/region';
 import { loadChart, type ChartStructure } from './chartData';
+import { SpatialGrid } from './spatialGrid';
 
 interface StructureStyle {
   /** 수면에서 윗면까지의 높이 (m). 자료에 높이가 없어서 종류별로 정한 값이다. */
@@ -39,7 +40,7 @@ interface Footprint {
  * 그래서 해도에 사용하는 윤곽 자료를 그대로 가져와서, 윤곽을 위로 밀어 올린 입체로 만든다.
  */
 export class Structures {
-  private readonly cells = new Map<string, Footprint[]>();
+  private readonly grid = new SpatialGrid<Footprint>(CELL_SIZE);
 
   constructor(scene: THREE.Scene) {
     void loadChart()
@@ -49,7 +50,7 @@ export class Structures {
 
   /** 월드의 (x, z) 지점이 구조물의 안쪽이면 그 윗면의 높이를, 아니면 undefined를 반환한다. */
   topAt(x: number, z: number): number | undefined {
-    for (const footprint of this.cells.get(cellKey(x, z)) ?? []) {
+    for (const footprint of this.grid.at(x, z)) {
       if (x < footprint.minX || x > footprint.maxX || z < footprint.minZ || z > footprint.maxZ) continue;
       if (isInside(footprint.ring, x, z)) return footprint.top;
     }
@@ -73,10 +74,8 @@ export class Structures {
   }
 
   private build(scene: THREE.Scene, structures: ChartStructure[]): void {
-    // 월드의 원점에서 수십 km 떨어진 좌표를 그대로 정점에 넣으면 GPU의 계산에서 정밀도가 떨어진다.
-    // 구역의 가운데를 기준으로 한 상대 좌표로 정점을 만들고, 메시를 그 기준점에 놓는다.
-    const { south, west, north, east } = region.bounds;
-    const anchor = latLonToWorld({ lat: (south + north) / 2, lon: (west + east) / 2 });
+    // 구역의 가운데를 기준으로 한 상대 좌표로 정점을 만들고, 메시를 그 기준점에 놓는다. (이유는 REGION_CENTER의 설명 참고)
+    const anchor = REGION_CENTER;
     const byColour = new Map<number, THREE.BufferGeometry[]>();
 
     for (const structure of structures) {
@@ -124,20 +123,8 @@ export class Structures {
       minZ = Math.min(minZ, z);
       maxZ = Math.max(maxZ, z);
     });
-    const footprint: Footprint = { ring, minX, maxX, minZ, maxZ, top };
-    for (let cz = Math.floor(minZ / CELL_SIZE); cz <= Math.floor(maxZ / CELL_SIZE); cz++) {
-      for (let cx = Math.floor(minX / CELL_SIZE); cx <= Math.floor(maxX / CELL_SIZE); cx++) {
-        const key = `${cx}/${cz}`;
-        const cell = this.cells.get(key);
-        if (cell) cell.push(footprint);
-        else this.cells.set(key, [footprint]);
-      }
-    }
+    this.grid.insertBox(minX, minZ, maxX, maxZ, { ring, minX, maxX, minZ, maxZ, top });
   }
-}
-
-function cellKey(x: number, z: number): string {
-  return `${Math.floor(x / CELL_SIZE)}/${Math.floor(z / CELL_SIZE)}`;
 }
 
 /** 중심선의 양쪽으로 halfWidth만큼 벌려서 윤곽을 만든다. 왼쪽을 따라갔다가 오른쪽을 따라 돌아온다. */

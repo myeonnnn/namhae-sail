@@ -1,5 +1,14 @@
 import * as THREE from 'three';
-import type { ShipState } from '../ship/shipPhysics';
+
+/** 항적을 남기는 물체의 운동 상태. 수면이 선박의 모듈을 참조하지 않도록, 필요한 값만 정의한다. */
+interface WakeSource {
+  x: number;
+  z: number;
+  /** 북쪽을 0으로 하는 시계 방향의 방위 (rad) */
+  heading: number;
+  /** 선수 방향의 속도 (m/s) */
+  surge: number;
+}
 
 const MAP_SIZE = 2048;
 const MAX_POINTS = 200;
@@ -111,7 +120,7 @@ export class Wake {
     this.trail.length = 0;
   }
 
-  update(elapsed: number, ship: ShipState): void {
+  update(elapsed: number, ship: WakeSource): void {
     this.recordTrail(elapsed, ship);
     this.buildRibbons(elapsed, ship);
 
@@ -121,7 +130,7 @@ export class Wake {
     this.renderer.setRenderTarget(null);
   }
 
-  private recordTrail(elapsed: number, ship: ShipState): void {
+  private recordTrail(elapsed: number, ship: WakeSource): void {
     const { trail } = this;
     const newest = trail[0];
     if (!newest || Math.hypot(ship.x - newest.x, ship.z - newest.z) >= this.pointSpacing) {
@@ -132,7 +141,7 @@ export class Wake {
     }
   }
 
-  private buildRibbons(elapsed: number, ship: ShipState): void {
+  private buildRibbons(elapsed: number, ship: WakeSource): void {
     const { length, beam } = this.hull;
     const sternOffset = -0.46 * length;
     const bowOffset = 0.42 * length;

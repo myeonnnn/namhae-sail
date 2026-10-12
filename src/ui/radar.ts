@@ -1,4 +1,6 @@
+import { METERS_PER_NAUTICAL_MILE } from '../geo/units';
 import type { ShipState } from '../ship/shipPhysics';
+import { WheelStepper } from './wheelStepper';
 
 /** 레이더가 주변을 탐지하는 데 사용하는 정보 */
 export interface RadarProbe {
@@ -14,7 +16,6 @@ export interface RadarProbe {
 const VIEW_SIZE = 196;
 const CENTER = VIEW_SIZE / 2;
 const RADIUS = CENTER - 3;
-const METERS_PER_NAUTICAL_MILE = 1852;
 // 탐지 거리의 단계 (해리). 레이더 위에서 휠을 돌리면 단계가 바뀐다.
 const RANGES = [0.25, 0.5, 1, 2, 4];
 const DEFAULT_RANGE_INDEX = 2;
@@ -31,8 +32,7 @@ const ECHO_COLOUR = '#8dffa6';
 const MARK_COLOUR = '#f6ffb0';
 const GRID_COLOUR = 'rgba(141, 255, 166, 0.3)';
 const LABEL_COLOUR = 'rgba(141, 255, 166, 0.75)';
-// 탐지 거리를 한 단계 바꾸는 데 필요한 휠의 양과, 다음 단계를 허용하기까지의 간격. 지도의 줌과 같은 방식이다.
-const WHEEL_STEP = 40;
+// 이어지는 스크롤에서 탐지 거리를 바꾼 뒤에 다음 단계를 허용하기까지의 간격
 const RANGE_COOLDOWN_MS = 350;
 
 /**
@@ -53,8 +53,7 @@ export class Radar {
   /** 탐지한 물체의 위치(월드 좌표)와 탐지한 시각 */
   private detections: { x: number; z: number; time: number; mark: boolean; point: boolean }[] = [];
   private clock = 0;
-  private wheelAccumulated = 0;
-  private lastRangeChange = -Infinity;
+  private readonly wheel = new WheelStepper({ cooldownMs: RANGE_COOLDOWN_MS });
 
   constructor(
     private readonly probe: RadarProbe,
@@ -72,12 +71,7 @@ export class Radar {
       'wheel',
       (event) => {
         event.preventDefault();
-        const now = performance.now();
-        this.wheelAccumulated += event.deltaY;
-        if (Math.abs(this.wheelAccumulated) < WHEEL_STEP || now - this.lastRangeChange < RANGE_COOLDOWN_MS) return;
-        const next = clamp(this.rangeIndex + Math.sign(this.wheelAccumulated), 0, RANGES.length - 1);
-        this.wheelAccumulated = 0;
-        this.lastRangeChange = now;
+        const next = clamp(this.rangeIndex + this.wheel.feed(event.deltaY), 0, RANGES.length - 1);
         if (next === this.rangeIndex) return;
         this.rangeIndex = next;
         // 탐지 거리가 바뀌면 탐지하는 간격도 달라지므로, 이전의 기록을 지우고 새로 모은다.

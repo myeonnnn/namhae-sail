@@ -1,4 +1,5 @@
 import type { ChartPlace } from '../world/chartData';
+import { createButton } from './dom';
 
 export interface DevToolsActions {
   toggleObserver(): void;
@@ -20,18 +21,8 @@ export function createDevTools(places: Promise<ChartPlace[]>, actions: DevToolsA
   const container = document.createElement('div');
   container.className = 'hud-devtools';
 
-  const button = (label: string, shortcut: string, onClick: () => void) => {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.tabIndex = -1;
-    element.innerHTML = `${label} <kbd>${shortcut}</kbd>`;
-    element.addEventListener('click', () => {
-      onClick();
-      // 버튼에 포커스가 남아 있으면 스로틀 중립 키인 Space가 버튼을 누르게 된다.
-      element.blur();
-    });
-    return element;
-  };
+  const button = (label: string, shortcut: string, onClick: () => void) =>
+    createButton({ html: `${label} <kbd>${shortcut}</kbd>`, onClick });
 
   const select = document.createElement('select');
   select.tabIndex = -1;

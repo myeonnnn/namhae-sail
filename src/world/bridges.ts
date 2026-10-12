@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { latLonToWorld } from '../geo/projection';
-import region from '../geo/region.json';
+import { REGION_CENTER } from '../geo/region';
 import { loadChart, type ChartBridge } from './chartData';
+import { SpatialGrid } from './spatialGrid';
 
 // 상판의 두께 (m)
 const DECK_THICKNESS = 1.8;
@@ -19,6 +20,8 @@ const PIER_BOTTOM = -6;
 // 사장교와 현수교의 주탑이 상판 위로 솟는 높이 (m)
 const TOWER_RISE = 48;
 const CELL_SIZE = 300;
+// 상판을 색인에 등록할 때 중심선의 주변으로 더 포함하는 거리 (m). 상판의 폭 절반보다 커야 한다.
+const SPAN_MARGIN = 30;
 const DECK_COLOUR = 0xa2a29c;
 const PIER_COLOUR = 0x8c8c86;
 
@@ -47,8 +50,8 @@ interface Pier {
  * 그래서 상판은 양 끝에서 완만하게 올라가서 가운데가 가장 높은 형태로 만들고, 교각은 일정한 간격으로 세운다.
  */
 export class Bridges {
-  private readonly spans = new Map<string, Span[]>();
-  private readonly piers = new Map<string, Pier[]>();
+  private readonly spans = new SpatialGrid<Span>(CELL_SIZE);
+  private readonly piers = new SpatialGrid<Pier>(CELL_SIZE);
   private readonly pierList: Pier[] = [];
 
   constructor(scene: THREE.Scene) {
@@ -64,7 +67,7 @@ export class Bridges {
 
   /** 월드의 (x, z) 지점이 교각이나 주탑의 안쪽이면 true */
   hitsPier(x: number, z: number): boolean {
-    for (const pier of this.piers.get(cellKey(x, z)) ?? []) {
+    for (const pier of this.piers.at(x, z)) {
       if (Math.hypot(x - pier.x, z - pier.z) <= pier.radius) return true;
     }
     return false;
@@ -73,7 +76,7 @@ export class Bridges {
   /** 월드의 (x, z) 지점이 다리의 아래이면 상판 아랫면의 높이를, 아니면 undefined를 반환한다. */
   clearanceAt(x: number, z: number): number | undefined {
     let lowest: number | undefined;
-    for (const { stations, halfWidth } of this.spans.get(cellKey(x, z)) ?? []) {
+    for (const { stations, halfWidth } of this.spans.at(x, z)) {
       for (let i = 0; i < stations.length - 1; i++) {
         const a = stations[i];
         const b = stations[i + 1];
@@ -91,8 +94,7 @@ export class Bridges {
 
   private build(scene: THREE.Scene, bridges: ChartBridge[]): void {
     // 구조물과 마찬가지로, 구역의 가운데를 기준으로 한 상대 좌표로 정점을 만들어서 정밀도를 유지한다.
-    const { south, west, north, east } = region.bounds;
-    const anchor = latLonToWorld({ lat: (south + north) / 2, lon: (west + east) / 2 });
+    const anchor = REGION_CENTER;
     const decks: THREE.BufferGeometry[] = [];
     const supports: THREE.BufferGeometry[] = [];
 
@@ -115,7 +117,8 @@ export class Bridges {
       });
 
       decks.push(createDeck(profile, halfWidth, anchor));
-      this.register(this.spans, profile, { stations: profile, halfWidth });
+      const span: Span = { stations: profile, halfWidth };
+      for (const station of profile) this.spans.insertPoint(station.x, station.z, span, SPAN_MARGIN);
 
       const tall = bridge.structure === 'cable-stayed' || bridge.structure === 'suspension';
       const towerAt = tall ? [Math.round(profile.length * 0.3), Math.round(profile.length * 0.7)] : [];
@@ -157,7 +160,7 @@ export class Bridges {
         const radius = Math.max(bridge.width * 0.3, PIER_THICKNESS / 2) + (isTower ? 4 : 0);
         const entry = { x: station.x, z: station.z, radius };
         this.pierList.push(entry);
-        this.register(this.piers, [station], entry, radius);
+        this.piers.insertPoint(station.x, station.z, entry, radius);
       }
     }
 
@@ -174,25 +177,6 @@ export class Bridges {
       scene.add(mesh);
     }
   }
-
-  /** 주어진 지점들이 걸쳐 있는 모든 격자 칸에 항목을 등록한다. margin은 지점의 주변으로 더 포함할 거리이다. */
-  private register<T>(index: Map<string, T[]>, points: { x: number; z: number }[], item: T, margin = 30): void {
-    const keys = new Set<string>();
-    for (const { x, z } of points) {
-      for (const dx of [-margin, 0, margin]) {
-        for (const dz of [-margin, 0, margin]) keys.add(cellKey(x + dx, z + dz));
-      }
-    }
-    for (const key of keys) {
-      const cell = index.get(key);
-      if (cell) cell.push(item);
-      else index.set(key, [item]);
-    }
-  }
-}
-
-function cellKey(x: number, z: number): string {
-  return `${Math.floor(x / CELL_SIZE)}/${Math.floor(z / CELL_SIZE)}`;
 }
 
 /** 꺾은선을 따라 일정한 간격으로 점을 다시 찍는다. 자료의 점은 간격이 제각각이어서, 높이의 변화를 고르게 표현할 수 없다. */

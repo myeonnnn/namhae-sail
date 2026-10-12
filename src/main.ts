@@ -17,8 +17,10 @@ import { Hud } from './ui/hud';
 import { SeamarkInspector } from './ui/seamarkInspector';
 import { createStartPointList } from './ui/startPoints';
 import { StartScreen } from './ui/startScreen';
+import { readStartOptions } from './dev/startOptions';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
-import region from './geo/region.json';
+import { isOutsideRegion, REGION } from './geo/region';
+import { resolveCollisions } from './sim/collisions';
 import { loadChart } from './world/chartData';
 import { loadSeamarkRecords } from './world/seamarkData';
 import { Seamarks } from './world/seamarks';
@@ -26,12 +28,11 @@ import { Bridges } from './world/bridges';
 import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
 
-// 운영 구역과 시작 위치는 src/geo/region.json에서 정한다. 자료를 내려받는 스크립트도 같은 파일을 읽는다.
 // 조종할 선박. shipSpec.ts에 정의된 다른 선박으로 바꾸면 모델과 조종 특성, 카메라의 거리가 함께 바뀐다.
 const SHIP = SPORT_YACHT;
 
-// region.json의 starts에 적힌 첫 번째 지점에서 시작한다. 나머지 지점은 설정 메뉴에서 골라서 이동할 수 있다.
-const START = region.starts[0];
+// 운영 구역의 첫 번째 시작 지점에서 시작한다. 나머지 지점은 설정 메뉴에서 골라서 이동할 수 있다.
+const START = REGION.starts[0];
 
 // 개발 도구(관찰 모드, 배의 순간 이동, 장소로 바로 이동, 주소로 시작 위치 지정)는 로컬의 개발 서버에서만 켠다.
 // Vite는 배포용으로 빌드할 때 import.meta.env.DEV를 false로 바꾸므로, 이 조건으로 감싼 코드는 결과물에서 제거된다.
@@ -47,19 +48,11 @@ const timeOfDay = createTimeOfDay();
 const wake = new Wake(renderer, SHIP.model);
 const ocean = new Ocean(scene, renderer, wake);
 const ship = new Ship(SHIP);
-// (개발 서버에서만) 주소에 ?lat=34.83&lon=128.43&heading=300과 같이 적으면 그 위치와 방향에서 시작한다. 특정 장소를 확인할 때 사용한다.
-// &observe를 덧붙이면 배는 기본 위치에 두고, 그 좌표를 관찰 모드로 바라보면서 시작한다. 육지 위의 좌표도 지정할 수 있다.
-const query = new URLSearchParams(location.search);
-const queryNumber = (name: string, fallback: number) => {
-  const value = DEV_TOOLS ? Number(query.get(name) ?? NaN) : NaN;
-  return Number.isFinite(value) ? value : fallback;
-};
-const startInObserver = DEV_TOOLS && query.has('observe');
-const queryPoint = latLonToWorld({ lat: queryNumber('lat', START.lat), lon: queryNumber('lon', START.lon) });
-const start = startInObserver ? latLonToWorld(START) : queryPoint;
-ship.state.x = start.x;
-ship.state.z = start.z;
-ship.state.heading = (queryNumber('heading', START.headingDeg) * Math.PI) / 180;
+// (개발 서버에서만) 주소로 시작 위치와 방향을 지정할 수 있다.
+const startOptions = readStartOptions(DEV_TOOLS, START);
+const requestedPoint = latLonToWorld(startOptions);
+Object.assign(ship.state, startOptions.observe ? latLonToWorld(START) : requestedPoint);
+ship.state.heading = degToRad(startOptions.headingDeg);
 scene.add(ship.object);
 
 const terrain = new Terrain(scene);
@@ -80,13 +73,14 @@ const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, wind, timeOfDa
     for (const pier of bridges.allPiers()) yield { x: pier.x, z: pier.z, structure: true };
   },
 });
-const alert = { message: '', at: -Infinity };
+const world = { terrain, structures, bridges, seamarks };
 
-// 운영 구역의 경계를 월드 좌표로 바꿔 둔다. 북쪽이 -Z이므로, 북쪽 끝의 z가 남쪽 끝의 z보다 작다.
-const regionMin = latLonToWorld({ lat: region.bounds.north, lon: region.bounds.west });
-const regionMax = latLonToWorld({ lat: region.bounds.south, lon: region.bounds.east });
-const isOutsideRegion = (x: number, z: number) =>
-  x < regionMin.x || x > regionMax.x || z < regionMin.z || z > regionMax.z;
+// 화면에 잠시 표시하는 경고. HUD가 표시한 시각을 보고 일정 시간이 지나면 숨긴다.
+const alert = { message: '', at: -Infinity };
+function showAlert(message: string): void {
+  alert.message = message;
+  alert.at = performance.now();
+}
 
 // 조작대의 크기는 화면의 크기에 따라 달라지므로, 크기가 바뀔 때마다 카메라에 다시 알려 준다.
 const syncBottomInset = () => stage.setBottomInset(hud.consoleHeight);
@@ -101,7 +95,7 @@ const FULL_IMPACT_SPEED = 15;
 let simulationTime = 0;
 
 /** 충돌한 쪽의 선체 끝에서 물보라를 일으키고 카메라를 흔든다. */
-function playImpact(speed: number, movingAhead: boolean, strength = 1): void {
+function playImpact(speed: number, movingAhead: boolean, strength: number): void {
   if (speed < MIN_IMPACT_SPEED) return;
   const intensity = Math.min(speed / FULL_IMPACT_SPEED, 1) * strength;
   const { x, z, heading } = ship.state;
@@ -109,6 +103,11 @@ function playImpact(speed: number, movingAhead: boolean, strength = 1): void {
   impactSpray.burst(x + Math.sin(heading) * reach, 0.5, z - Math.cos(heading) * reach, intensity, SHIP.model.beam);
   chaseCamera.shake(intensity);
 }
+
+function degToRad(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
 // ---- 관찰 모드와 개발 도구 ----
 const observer = new Observer();
 // 관찰 모드에서 휠로 조절할 수 있는 카메라 거리의 범위 (m). 구역 전체를 내려다볼 수 있을 만큼 멀리 허용한다.
@@ -130,8 +129,7 @@ function moveShipToObserver(): void {
   if (!observer.active) return;
   const { x, z } = observer;
   if (isOutsideRegion(x, z) || terrain.isLand(x, z) || structures.contains(x, z) || bridges.hitsPier(x, z)) {
-    alert.message = '이 위치로는 배를 옮길 수 없습니다 (육지, 구조물 또는 구역의 바깥)';
-    alert.at = performance.now();
+    showAlert('이 위치로는 배를 옮길 수 없습니다 (육지, 구조물 또는 구역의 바깥)');
     return;
   }
   placeShip(x, z, ship.state.heading);
@@ -153,9 +151,9 @@ function placeShip(x: number, z: number, heading: number): void {
 
 hud.addSettingsSection(
   '시작 위치',
-  createStartPointList(region.starts, (point) => {
+  createStartPointList(REGION.starts, (point) => {
     const { x, z } = latLonToWorld(point);
-    placeShip(x, z, (point.headingDeg * Math.PI) / 180);
+    placeShip(x, z, degToRad(point.headingDeg));
     hud.closeSettings();
   }),
 );
@@ -177,17 +175,16 @@ if (DEV_TOOLS) {
   );
 }
 
-if (startInObserver) {
+if (startOptions.observe) {
   setObserver(true);
-  Object.assign(observer, queryPoint);
+  Object.assign(observer, requestedPoint);
 }
 
 const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement>('#hud')!, canvas, seamarks);
 
 // ---- 시작 화면 ----
 const startScreen = new StartScreen(document.body);
-// 개발 서버에서 주소로 위치를 지정했을 때에는 특정 장소를 바로 확인하려는 것이므로 시작 화면을 건너뛴다.
-if (DEV_TOOLS && (query.has('lat') || query.has('observe') || query.has('skipIntro'))) startScreen.dismiss();
+if (startOptions.skipIntro) startScreen.dismiss();
 // 선박의 모델과 지도의 자료를 받은 다음에, 주변의 지형이 모두 그려질 때까지 기다린다.
 // 자료를 받지 못해도 시작은 할 수 있어야 하므로 실패는 무시하고, 15초가 지나면 기다리지 않는다.
 const assetsLoaded = Promise.allSettled([ship.ready, loadChart(), loadSeamarkRecords()]);
@@ -208,70 +205,10 @@ startLoop({
     const impactSpeed = Math.hypot(surge, sway);
     const movingAhead = surge >= 0;
 
-    if (isOutsideRegion(ship.state.x, ship.state.z)) {
-      // 구역의 바깥에는 지도와 표지의 자료가 없으므로, 경계에서 배를 세운다.
-      alert.message = '항해 구역의 끝입니다: 후진(S)으로 되돌아가세요';
-      alert.at = performance.now();
-      ship.stopAtPreviousPosition();
-      return;
-    }
-
-    if (ship.resolveGrounding((x, z) => terrain.isLand(x, z))) {
-      alert.message = '좌초: 후진(S)으로 이탈';
-      alert.at = performance.now();
-      playImpact(impactSpeed, movingAhead);
-      return;
-    }
-
-    if (ship.resolveGrounding((x, z) => bridges.hitsPier(x, z))) {
-      alert.message = '교각과 충돌: 후진(S)으로 이탈';
-      alert.at = performance.now();
-      playImpact(impactSpeed, movingAhead);
-      return;
-    }
-
-    // 다리 밑의 높이가 선박보다 낮으면 지나갈 수 없다.
-    let blockedClearance: number | undefined;
-    const tooLow = (x: number, z: number) => {
-      const clearance = bridges.clearanceAt(x, z);
-      if (clearance === undefined || clearance >= SHIP.model.airDraft) return false;
-      blockedClearance = clearance;
-      return true;
-    };
-    if (ship.resolveGrounding(tooLow)) {
-      alert.message = `다리 밑을 지날 수 없습니다: 높이 ${blockedClearance!.toFixed(0)}m, 선박 ${SHIP.model.airDraft}m`;
-      alert.at = performance.now();
-      playImpact(impactSpeed, movingAhead);
-      return;
-    }
-
-    if (ship.resolveGrounding((x, z) => structures.contains(x, z))) {
-      alert.message = '방파제 또는 부두와 충돌: 후진(S)으로 이탈';
-      alert.at = performance.now();
-      playImpact(impactSpeed, movingAhead);
-      return;
-    }
-
-    const mark = seamarks.collide(
-      ship.state.x,
-      ship.state.z,
-      ship.state.heading,
-      SHIP.model.length / 2,
-      SHIP.model.beam / 2,
-      simulationTime,
-    );
-    if (mark?.kind === 'buoy') {
-      // 부표는 물에 떠 있어서 밀려난다. 배는 속력을 조금 잃고 그대로 지나간다.
-      alert.message = '부표와 충돌';
-      alert.at = performance.now();
-      playImpact(impactSpeed, movingAhead, 0.4);
-      ship.state.surge *= 0.85;
-    } else if (mark) {
-      alert.message = `${mark.kind === 'light' ? '등대' : '등표'}와 충돌: 후진(S)으로 이탈`;
-      alert.at = performance.now();
-      ship.stopAtPreviousPosition();
-      playImpact(impactSpeed, movingAhead);
-    }
+    const collision = resolveCollisions(ship, SHIP, world, simulationTime);
+    if (!collision) return;
+    showAlert(collision.message);
+    if (collision.impact > 0) playImpact(impactSpeed, movingAhead, collision.impact);
   },
   render(frameTime, elapsed) {
     if (assetsDone && terrain.isSettled) startScreen.markReady();

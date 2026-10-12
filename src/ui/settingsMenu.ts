@@ -1,3 +1,5 @@
+import { createButton } from './dom';
+
 const GEAR_ICON = `
   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M10.3 4.3c.4-1.7 2.9-1.7 3.4 0a1.7 1.7 0 0 0 2.6 1.1c1.5-.9 3.3.8 2.4 2.4a1.7 1.7 0 0 0 1 2.5c1.8.5 1.8 3 0 3.4a1.7 1.7 0 0 0-1 2.6c.9 1.5-.9 3.3-2.4 2.4a1.7 1.7 0 0 0-2.6 1c-.5 1.8-3 1.8-3.4 0a1.7 1.7 0 0 0-2.6-1c-1.5.9-3.3-.9-2.4-2.4a1.7 1.7 0 0 0-1-2.6c-1.8-.4-1.8-2.9 0-3.4a1.7 1.7 0 0 0 1-2.5c-.9-1.6.9-3.3 2.4-2.4a1.7 1.7 0 0 0 2.6-1.1z" />
@@ -10,26 +12,21 @@ const BUTTON_LABEL = '설정';
  * 메뉴 안의 각 항목은 제목을 누르면 내용이 펼쳐지는 구역이며, addSection으로 추가한다.
  */
 export class SettingsMenu {
-  private readonly button = document.createElement('button');
+  private readonly button: HTMLButtonElement;
   private readonly dropdown = document.createElement('div');
 
   constructor(root: HTMLElement) {
     const container = document.createElement('div');
     container.className = 'hud-settings';
 
-    const { button, dropdown } = this;
-    button.type = 'button';
-    button.className = 'hud-icon-button hud-settings-button';
-    button.tabIndex = -1;
-    button.innerHTML = GEAR_ICON;
-    button.title = BUTTON_LABEL;
-    button.setAttribute('aria-label', BUTTON_LABEL);
+    const { dropdown } = this;
+    const button = (this.button = createButton({
+      html: GEAR_ICON,
+      className: 'hud-icon-button hud-settings-button',
+      label: BUTTON_LABEL,
+      onClick: () => this.setOpen(dropdown.hidden !== false),
+    }));
     button.setAttribute('aria-haspopup', 'true');
-    button.addEventListener('click', () => {
-      this.setOpen(dropdown.hidden !== false);
-      // 버튼에 포커스가 남아 있으면 스로틀 중립 키인 Space가 버튼을 누르게 된다.
-      button.blur();
-    });
 
     dropdown.className = 'hud-panel hud-settings-dropdown';
     this.setOpen(false);
@@ -51,20 +48,15 @@ export class SettingsMenu {
     const section = document.createElement('section');
     section.className = 'hud-settings-section';
 
-    const header = document.createElement('button');
-    header.type = 'button';
-    header.className = 'hud-settings-header';
-    header.tabIndex = -1;
-    header.textContent = title;
-
+    const header = createButton({
+      content: title,
+      className: 'hud-settings-header',
+      onClick: () => setExpanded(content.hidden !== false),
+    });
     const setExpanded = (value: boolean) => {
       content.hidden = !value;
       header.setAttribute('aria-expanded', String(value));
     };
-    header.addEventListener('click', () => {
-      setExpanded(content.hidden !== false);
-      header.blur();
-    });
     setExpanded(expanded);
 
     content.classList.add('hud-settings-content');

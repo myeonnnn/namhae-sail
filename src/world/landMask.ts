@@ -1,5 +1,5 @@
 import { latLonToTile } from '../geo/projection';
-import region from '../geo/region.json';
+import { REGION } from '../geo/region';
 
 const LAND_URL = '/data/land.json';
 
@@ -24,10 +24,10 @@ export class LandMask {
   private readonly context: OffscreenCanvasRenderingContext2D;
   // 해안선 자료가 있는 범위. 이 범위의 바깥은 판정할 수 없으므로 표고 자료를 그대로 사용한다.
   private readonly covered = {
-    west: region.bounds.west - region.dataMargin,
-    east: region.bounds.east + region.dataMargin,
-    south: region.bounds.south - region.dataMargin,
-    north: region.bounds.north + region.dataMargin,
+    west: REGION.bounds.west - REGION.dataMargin,
+    east: REGION.bounds.east + REGION.dataMargin,
+    south: REGION.bounds.south - REGION.dataMargin,
+    north: REGION.bounds.north + REGION.dataMargin,
   };
 
   private constructor(

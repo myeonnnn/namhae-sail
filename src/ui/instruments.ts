@@ -1,7 +1,7 @@
 import { windVelocity, type Wind } from '../environment/wind';
+import { formatBearing, MS_TO_KNOTS } from '../geo/units';
 import { apparentWind, type ShipControls, type ShipState } from '../ship/shipPhysics';
 
-const MS_TO_KNOTS = 1.943844;
 const MAX_RUDDER_DEG = 35;
 // 이 속력보다 느리면 이동 방향이 불안정하므로 대지 침로를 표시하지 않는다. 나침반의 기준과 동일하다.
 const MIN_COURSE_SPEED = 0.2;
@@ -172,12 +172,5 @@ export class Instruments {
       apparentSpeed < 0.3
         ? '없음'
         : `${side}${Math.abs(fromAngle).toFixed(0)}° · ${apparentSpeed.toFixed(1)} m/s`;
-
   }
-}
-
-/** 라디안 각도를 항해에서 사용하는 세 자리의 방위로 표시한다. */
-function formatBearing(radians: number): string {
-  const degrees = Math.round((radians * 180) / Math.PI);
-  return `${String(((degrees % 360) + 360) % 360).padStart(3, '0')}°`;
 }

@@ -1,10 +1,10 @@
 import type * as THREE from 'three';
+import { formatBearing, formatDistance } from '../geo/units';
 import type { ShipState } from '../ship/shipPhysics';
 import type { Seamark, SeamarkKind, Seamarks } from '../world/seamarks';
 
 // 마우스에서 이 거리(픽셀) 안에 있는 표지만 선택한다.
 const PICK_RADIUS = 22;
-const METERS_PER_NAUTICAL_MILE = 1852;
 
 const KIND_NAMES: Record<SeamarkKind, string> = { light: '등대', beacon: '등표', buoy: '부표' };
 const COLOUR_NAMES: Record<string, string> = {
@@ -81,8 +81,7 @@ export class SeamarkInspector {
     }
     const east = hit.mark.x - ship.x;
     const north = -(hit.mark.z - ship.z);
-    const bearing = ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
-    this.tooltip.lastElementChild!.textContent = `방위 ${String(Math.round(bearing) % 360).padStart(3, '0')}° · ${formatDistance(Math.hypot(east, north))}`;
+    this.tooltip.lastElementChild!.textContent = `방위 ${formatBearing(Math.atan2(east, north))} · ${formatDistance(Math.hypot(east, north))}`;
   }
 }
 
@@ -113,11 +112,4 @@ function describe(mark: Seamark): HTMLElement[] {
   if (mark.height) lines.push(line('', `등화 높이: 해수면에서 ${mark.height} m`));
   lines.push(line('hud-value hud-seamark-range', ''));
   return lines;
-}
-
-function formatDistance(meters: number): string {
-  const nauticalMiles = (meters / METERS_PER_NAUTICAL_MILE).toFixed(meters < 1852 ? 2 : 1);
-  return meters < 1000
-    ? `${Math.round(meters)} m (${nauticalMiles} 해리)`
-    : `${(meters / 1000).toFixed(1)} km (${nauticalMiles} 해리)`;
 }

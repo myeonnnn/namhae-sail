@@ -20,10 +20,12 @@ import Stroke from 'ol/style/Stroke';
 import Style from 'ol/style/Style';
 import Text from 'ol/style/Text';
 import { worldToLatLon } from '../geo/projection';
-import region from '../geo/region.json';
+import { REGION } from '../geo/region';
+import { formatLatLon } from '../geo/units';
 import type { ShipState } from '../ship/shipPhysics';
 import { loadChart, type ChartPlace, type PlaceKind } from '../world/chartData';
 import { loadSeamarkRecords, type SeamarkRecord } from '../world/seamarkData';
+import { WheelStepper } from './wheelStepper';
 
 const LAND_URL = '/data/land.json';
 // 지명은 종류에 따라 글자의 크기와 표시를 시작하는 축척이 다르다. 한 픽셀이 maxResolution(m)보다 넓으면 숨긴다.
@@ -40,15 +42,8 @@ const LABEL_HALO = new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 }
 const DEFAULT_ZOOM = 11;
 const MIN_ZOOM = 7;
 const MAX_ZOOM = 16;
-// 줌을 한 단계 바꾸는 데 필요한 스크롤의 양.
-// 마우스 휠의 한 칸이 보내는 값은 운영 체제와 장치에 따라 40에서 120까지 다르므로, 가장 작은 값에 맞춘다.
-const WHEEL_STEP = 40;
 // 이어지는 스크롤에서 줌을 바꾼 뒤에 다음 단계를 허용하기까지의 간격
 const ZOOM_COOLDOWN_MS = 500;
-// 스크롤 이벤트 사이의 멈춤이 이보다 길면 마우스 휠의 새로운 한 칸으로 본다.
-const WHEEL_NOTCH_PAUSE_MS = 120;
-// 스크롤이 이 시간 동안 멈추면 모아 둔 양을 버린다.
-const WHEEL_IDLE_RESET_MS = 300;
 // 지도의 중심과 자선의 표시를 갱신하는 간격. 매 프레임 갱신하면 육지의 폴리곤을 다시 그리는 비용이 커진다.
 const REFRESH_INTERVAL_MS = 100;
 // 항적에 점을 추가하는 이동 거리 (m)와 보관하는 점의 최대 개수
@@ -81,7 +76,7 @@ const SHIP_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
 export class Minimap {
   private readonly position = document.createElement('div');
   private readonly view = new View({
-    center: fromLonLat([region.starts[0].lon, region.starts[0].lat]),
+    center: fromLonLat([REGION.starts[0].lon, REGION.starts[0].lat]),
     zoom: DEFAULT_ZOOM,
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
@@ -96,9 +91,7 @@ export class Minimap {
   private lastRefreshTime = -Infinity;
   private lastTrackX = Infinity;
   private lastTrackZ = Infinity;
-  private wheelAccumulated = 0;
-  private lastWheelTime = -Infinity;
-  private lastZoomTime = -Infinity;
+  private readonly wheel = new WheelStepper({ cooldownMs: ZOOM_COOLDOWN_MS });
 
   constructor(root: HTMLElement) {
     const panel = document.createElement('div');
@@ -166,7 +159,7 @@ export class Minimap {
       .catch((error) => console.warn('해도의 육지 자료를 불러오지 못했습니다.', error));
 
     // 운영 구역의 경계. 이 선의 바깥으로는 항해할 수 없다.
-    const { south, west, north, east } = region.bounds;
+    const { south, west, north, east } = REGION.bounds;
     const boundary = new Feature(
       new Polygon([ring([[west, south], [east, south], [east, north], [west, north], [west, south]])]),
     );
@@ -223,22 +216,11 @@ export class Minimap {
       'wheel',
       (event) => {
         event.preventDefault();
-        // 트랙패드는 한 번의 손동작에 수십 개의 작은 이벤트를 보낸다.
-        // 이벤트마다 줌을 바꾸면 한꺼번에 여러 단계가 넘어가므로, 스크롤한 양을 모아서 일정량이 될 때마다 한 단계만 바꾼다.
-        const now = performance.now();
-        const pause = now - this.lastWheelTime;
-        if (pause > WHEEL_IDLE_RESET_MS) this.wheelAccumulated = 0;
-        this.lastWheelTime = now;
-        this.wheelAccumulated += event.deltaY;
-        if (Math.abs(this.wheelAccumulated) < WHEEL_STEP) return;
-        // 끊기지 않고 이어지는 스크롤(트랙패드의 관성 포함)에서는 일정한 간격으로만 다음 단계를 허용한다.
-        // 마우스 휠처럼 칸마다 멈춤이 있는 입력은 칸마다 한 단계씩 바로 반응한다.
-        if (pause < WHEEL_NOTCH_PAUSE_MS && now - this.lastZoomTime < ZOOM_COOLDOWN_MS) return;
-
-        const zoom = Math.round(this.view.getZoom() ?? DEFAULT_ZOOM) - Math.sign(this.wheelAccumulated);
+        // 휠을 위로 돌리면(-1) 확대하고, 아래로 돌리면 축소한다.
+        const step = this.wheel.feed(event.deltaY);
+        if (step === 0) return;
+        const zoom = Math.round(this.view.getZoom() ?? DEFAULT_ZOOM) - step;
         this.view.setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)));
-        this.wheelAccumulated = 0;
-        this.lastZoomTime = now;
       },
       { passive: false },
     );
@@ -263,7 +245,7 @@ export class Minimap {
     const coordinate = fromLonLat([lon, lat]);
     const centre = focus ? worldToLatLon(focus.x, focus.z) : { lat, lon };
     const centreCoordinate = fromLonLat([centre.lon, centre.lat]);
-    this.position.textContent = `${formatAngle(centre.lat, 'N', 'S')}  ${formatAngle(centre.lon, 'E', 'W')}`;
+    this.position.textContent = formatLatLon(centre.lat, centre.lon);
 
     this.view.setCenter(centreCoordinate);
     // 십자선은 관찰 모드에서만 보이도록, 평소에는 지도의 범위 밖으로 치워 둔다.
@@ -317,12 +299,4 @@ export class Minimap {
     }
     return style;
   }
-}
-
-/** 해도에서 사용하는 도와 분의 형식으로 표시한다. 위도 1분은 1해리(1852m)에 해당한다. */
-function formatAngle(value: number, positive: string, negative: string): string {
-  const absolute = Math.abs(value);
-  const degrees = Math.floor(absolute);
-  const minutes = (absolute - degrees) * 60;
-  return `${degrees}°${minutes.toFixed(3).padStart(6, '0')}′${value >= 0 ? positive : negative}`;
 }

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { latLonToWorld } from '../geo/projection';
 import { sampleWaveHeight } from '../ocean/waves';
 import { loadSeamarkRecords, type SeamarkKind, type SeamarkRecord } from './seamarkData';
+import { SpatialGrid } from './spatialGrid';
 
 export type { SeamarkKind } from './seamarkData';
 
@@ -107,7 +108,7 @@ export interface SeamarkHit {
  * 같은 종류의 표지는 형태가 동일하므로 InstancedMesh로 한 번에 그리고, 배 주변의 표지만 골라서 배치한다.
  */
 export class Seamarks {
-  private readonly cells = new Map<string, Seamark[]>();
+  private readonly grid = new SpatialGrid<Seamark>(CELL_SIZE);
   private readonly bodies: Record<SeamarkKind, THREE.InstancedMesh>;
   private readonly lamps: THREE.InstancedMesh;
   private active: Seamark[] = [];
@@ -317,10 +318,7 @@ export class Seamarks {
           hitDirZ: 0,
           phase: (index * 0.618034 * 10) % 10,
         };
-        const key = cellKey(x, z);
-        const cell = this.cells.get(key);
-        if (cell) cell.push(mark);
-        else this.cells.set(key, [mark]);
+        this.grid.insertPoint(x, z, mark);
       });
     } catch (error) {
       console.warn('해상 표지 자료를 불러오지 못했습니다.', error);
@@ -329,23 +327,10 @@ export class Seamarks {
 
   /** 격자로 나누어 둔 표지 중에서 배 주변의 칸만 조사해서, 보이는 거리 안의 표지를 모은다. */
   private collectNearby(focusX: number, focusZ: number): Seamark[] {
-    const result: Seamark[] = [];
-    const reach = Math.ceil(VISIBLE_RADIUS / CELL_SIZE);
-    const centerX = Math.floor(focusX / CELL_SIZE);
-    const centerZ = Math.floor(focusZ / CELL_SIZE);
-    for (let cz = centerZ - reach; cz <= centerZ + reach; cz++) {
-      for (let cx = centerX - reach; cx <= centerX + reach; cx++) {
-        for (const mark of this.cells.get(`${cx}/${cz}`) ?? []) {
-          if (Math.hypot(mark.x - focusX, mark.z - focusZ) <= VISIBLE_RADIUS) result.push(mark);
-        }
-      }
-    }
-    return result;
+    return this.grid
+      .near(focusX, focusZ, VISIBLE_RADIUS)
+      .filter((mark) => Math.hypot(mark.x - focusX, mark.z - focusZ) <= VISIBLE_RADIUS);
   }
-}
-
-function cellKey(x: number, z: number): string {
-  return `${Math.floor(x / CELL_SIZE)}/${Math.floor(z / CELL_SIZE)}`;
 }
 
 function bodyColour(mark: Seamark): number {

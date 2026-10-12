@@ -1,9 +1,9 @@
 import { sunPosition, type TimeOfDay } from '../environment/sun';
 import { compassName, MAX_WIND_SPEED, type Wind } from '../environment/wind';
 import { WORLD_ORIGIN } from '../geo/projection';
+import { formatBearing, MS_TO_KNOTS } from '../geo/units';
 import { significantWaveHeight } from '../ocean/waves';
-
-const MS_TO_KNOTS = 1.943844;
+import { createButton } from './dom';
 
 // 조절 막대 세 개를 나란히 그린 아이콘. 값을 조정하는 설정을 나타내는 데 널리 쓰이는 형태이다.
 const SLIDERS_ICON = `
@@ -49,21 +49,16 @@ export class EnvironmentPanel {
       this.createSlider('풍향', 0, 355, 5, wind.fromDeg, (value) => (wind.fromDeg = value)),
     );
 
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.tabIndex = -1;
-    toggle.className = 'hud-icon-button';
-    toggle.innerHTML = SLIDERS_ICON;
-    // 아이콘만 있는 버튼이므로, 마우스를 올렸을 때의 설명과 화면 낭독기용 이름을 함께 지정한다.
-    toggle.title = TOGGLE_LABEL;
-    toggle.setAttribute('aria-label', TOGGLE_LABEL);
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.addEventListener('click', () => {
-      controls.hidden = !controls.hidden;
-      toggle.setAttribute('aria-expanded', String(!controls.hidden));
-      // 버튼에 포커스가 남아 있으면 스로틀 중립 키인 Space가 버튼을 누르게 된다.
-      toggle.blur();
+    const toggle = createButton({
+      html: SLIDERS_ICON,
+      className: 'hud-icon-button',
+      label: TOGGLE_LABEL,
+      onClick: () => {
+        controls.hidden = !controls.hidden;
+        toggle.setAttribute('aria-expanded', String(!controls.hidden));
+      },
     });
+    toggle.setAttribute('aria-expanded', 'false');
 
     summary.append(lines, toggle);
     panel.append(summary, controls);
@@ -82,7 +77,7 @@ export class EnvironmentPanel {
     this.windSummary.textContent =
       speed < 0.1
         ? '바람 없음'
-        : `${compassName(fromDeg)}풍 ${String(fromDeg).padStart(3, '0')}° · ${speed.toFixed(1)} m/s (${(speed * MS_TO_KNOTS).toFixed(0)} kn)`;
+        : `${compassName(fromDeg)}풍 ${formatBearing((fromDeg * Math.PI) / 180)} · ${speed.toFixed(1)} m/s (${(speed * MS_TO_KNOTS).toFixed(0)} kn)`;
     this.waveSummary.textContent = `유의파고 ${significantWaveHeight(speed).toFixed(1)} m`;
   }
 
