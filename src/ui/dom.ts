@@ -30,3 +30,16 @@ export function createButton(options: {
   });
   return button;
 }
+
+/**
+ * 글자가 바뀌었을 때에만 고친다.
+ * 매 프레임 갱신하는 표시 장치에서 같은 값을 다시 쓰면, 브라우저가 그때마다 글자를 새로 만들고 배치를 다시 계산한다.
+ */
+export function writeText(element: Element, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+/** 속성의 값이 바뀌었을 때에만 고친다. */
+export function writeAttribute(element: Element, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { Wind } from '../environment/wind';
 import type { ShipState } from '../ship/shipPhysics';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -10,7 +9,6 @@ const AXIS_LENGTH = 39;
 const BUBBLE_RADIUS = 8.5;
 const EQUATOR_SEGMENTS = 48;
 const MOTION_COLOR = '#ffd24a';
-const WIND_COLOR = '#7fd0ff';
 const UP_COLOR = '#6ddc6d';
 // 이 속력보다 느리면 이동 방향이 불안정하므로 선수 방향을 대신 표시한다.
 const MIN_COURSE_SPEED = 0.2;
@@ -33,7 +31,7 @@ interface CardinalElements {
 /**
  * 3D 편집 도구의 시점 표시기와 같은 구 형태의 나침반.
  * 월드의 방위를 현재 카메라의 회전 그대로 투영하므로, 카메라를 돌리면 구가 함께 돌아간다.
- * 노란색 화살표는 배가 실제로 이동하는 방향이고, 하늘색 화살표는 바람이 불어 가는 방향이다.
+ * 노란색 화살표는 배가 실제로 이동하는 방향이다. 바람과 파도의 방향은 계기판의 선수 기준 계기에 표시한다.
  */
 export class Compass {
   readonly element = createSvg('svg');
@@ -43,9 +41,6 @@ export class Compass {
   private readonly motionShaft = createSvg('line');
   private readonly motionHead = createSvg('polygon');
   private readonly motion = createSvg('g');
-  private readonly windShaft = createSvg('line');
-  private readonly windHead = createSvg('polygon');
-  private readonly windArrow = createSvg('g');
   private readonly cardinals: CardinalElements[];
   private readonly inverseRotation = new THREE.Quaternion();
   private readonly scratch = new THREE.Vector3();
@@ -77,16 +72,11 @@ export class Compass {
     this.upBubble.setAttribute('r', '5');
     this.upBubble.setAttribute('fill', UP_COLOR);
 
-    for (const [shaft, head, group, color] of [
-      [this.windShaft, this.windHead, this.windArrow, WIND_COLOR],
-      [this.motionShaft, this.motionHead, this.motion, MOTION_COLOR],
-    ] as const) {
-      shaft.setAttribute('stroke', color);
-      shaft.setAttribute('stroke-width', '3');
-      shaft.setAttribute('stroke-linecap', 'round');
-      head.setAttribute('fill', color);
-      group.append(shaft, head);
-    }
+    this.motionShaft.setAttribute('stroke', MOTION_COLOR);
+    this.motionShaft.setAttribute('stroke-width', '3');
+    this.motionShaft.setAttribute('stroke-linecap', 'round');
+    this.motionHead.setAttribute('fill', MOTION_COLOR);
+    this.motion.append(this.motionShaft, this.motionHead);
 
     this.cardinals = CARDINALS.map(({ label, color }) => {
       const group = createSvg('g');
@@ -117,13 +107,12 @@ export class Compass {
       this.equator,
       this.upLine,
       this.upBubble,
-      this.windArrow,
       this.motion,
       ...this.cardinals.map((c) => c.group),
     );
   }
 
-  update(camera: THREE.Camera, ship: ShipState, wind: Wind): void {
+  update(camera: THREE.Camera, ship: ShipState): void {
     // 카메라 회전의 역을 적용하면 월드 방향이 카메라 기준(오른쪽 +x, 위 +y, 화면 앞쪽 +z)으로 변환된다.
     this.inverseRotation.copy(camera.quaternion).invert();
 
@@ -158,7 +147,6 @@ export class Compass {
     [...this.cardinals].sort((a, b) => a.depth - b.depth).forEach((c) => this.element.append(c.group));
 
     this.updateMotion(ship);
-    this.updateWind(wind);
   }
 
   private updateMotion(ship: ShipState): void {
@@ -179,13 +167,6 @@ export class Compass {
 
     this.drawArrow(this.motionShaft, this.motionHead, dirX, dirZ, 0, AXIS_LENGTH * 0.68);
     this.motion.setAttribute('opacity', moving ? '1' : '0.4');
-  }
-
-  private updateWind(wind: Wind): void {
-    const toward = ((wind.fromDeg + 180) * Math.PI) / 180;
-    // 바람이 불어오는 쪽의 가장자리에서 시작해서 중심 부근까지 그린다.
-    this.drawArrow(this.windShaft, this.windHead, Math.sin(toward), -Math.cos(toward), -AXIS_LENGTH * 0.95, -AXIS_LENGTH * 0.3);
-    this.windArrow.setAttribute('visibility', wind.speed < 0.1 ? 'hidden' : 'visible');
   }
 
   /** 수평면 위에서 (dirX, dirZ) 방향으로 from부터 to까지 이어지는 화살표를 그린다. */

@@ -215,7 +215,7 @@ body {
 
 .hud-gauges {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   align-items: end;
   gap: 14px;
 }
@@ -373,6 +373,49 @@ body {
 
 .hud-value[data-danger='true'] {
   color: var(--hud-port);
+}
+
+/* 파도의 방향 */
+
+.hud-sea-beam {
+  fill: none;
+  stroke: var(--hud-port);
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.hud-sea-wind {
+  fill: var(--hud-ahead);
+}
+
+.hud-sea-swell {
+  fill: var(--hud-astern);
+}
+
+.hud-sea-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.hud-sea-legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.hud-sea-legend i + i,
+.hud-sea-dot-swell {
+  margin-left: 4px;
+}
+
+.hud-sea-dot-wind {
+  background: var(--hud-ahead);
+}
+
+.hud-sea-dot-swell {
+  background: var(--hud-astern);
 }
 
 /* 겉보기 바람 */

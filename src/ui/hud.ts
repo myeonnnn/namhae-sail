@@ -51,7 +51,12 @@ export class Hud {
   private readonly settings: SettingsMenu;
   private readonly environment: EnvironmentPanel;
 
-  constructor(root: HTMLElement, weather: Weather, timeOfDay: TimeOfDay, radarProbe: RadarProbe) {
+  constructor(
+    root: HTMLElement,
+    private readonly weather: Weather,
+    timeOfDay: TimeOfDay,
+    radarProbe: RadarProbe,
+  ) {
     const { bottom } = this;
     bottom.className = 'hud-bottom';
     this.minimap = new Minimap(bottom);
@@ -136,10 +141,10 @@ export class Hud {
   update({ frameTime, camera, state, controls, wind, engine, heel, fetch, shipLength, alert, focus }: HudFrame): void {
     this.minimap.update(state, focus);
     this.modeHint.hidden = !focus;
-    this.instruments.update(state, controls, wind, engine, heel);
+    this.instruments.update(state, controls, wind, engine, heel, this.weather.swell);
     this.environment.update(fetch);
     this.radar.update(frameTime, state, shipLength);
-    this.compass.update(camera, state, wind);
+    this.compass.update(camera, state);
     this.alert.hidden = performance.now() - alert.at > ALERT_HOLD_MS;
     if (!this.alert.hidden && this.alert.textContent !== alert.message) this.alert.textContent = alert.message;
   }
