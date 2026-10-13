@@ -231,6 +231,9 @@ if (startOptions.observe) {
 
 const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement>('#hud')!, canvas, seamarks);
 
+// (개발 서버에서만) 브라우저의 콘솔과 성능 측정 스크립트에서 장면을 조사할 수 있도록 주요 객체를 꺼내 둔다.
+if (DEV_TOOLS) Object.assign(window, { __namhae: { stage, renderer, scene, camera, ship, ocean } });
+
 // ---- 시작 화면 ----
 const startScreen = new StartScreen(document.body);
 if (startOptions.skipIntro) startScreen.dismiss();
@@ -261,6 +264,8 @@ startLoop({
   },
   render(frameTime, elapsed) {
     if (assetsDone && terrain.isSettled) startScreen.markReady();
+    // 시작 화면이 떠 있는 동안에는 자료를 불러오느라 프레임이 느리므로, 항해를 시작한 뒤부터 해상도를 조절한다.
+    if (startScreen.dismissed) stage.adaptResolution(frameTime);
     if (input.isDown('KeyC')) chaseCamera.resetView();
     if (ship.capsized && input.consumePress('KeyR')) placeShip(restart.x, restart.z, restart.heading);
     if (DEV_TOOLS) {

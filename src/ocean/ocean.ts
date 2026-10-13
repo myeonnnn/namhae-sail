@@ -62,6 +62,10 @@ export class Ocean {
     skyUniforms['rayleigh'].value = 1.2;
     skyUniforms['mieCoefficient'].value = 0.005;
     skyUniforms['mieDirectionalG'].value = 0.8;
+    // 하늘의 셰이더는 대기의 산란을 픽셀마다 계산해서 장면에서 가장 무겁다.
+    // 다른 물체보다 먼저 그리면 수면과 지형에 가려질 픽셀까지 모두 계산하게 되므로, 가장 나중에 그려서 비어 있는 픽셀만 채운다.
+    // Sky는 정점의 깊이를 가장 먼 값으로 고정하므로, 이미 그려진 물체가 있는 픽셀은 깊이 검사에서 걸러진다.
+    this.sky.renderOrder = 1;
     scene.add(this.sky);
 
     const bakeSky = new Sky();
