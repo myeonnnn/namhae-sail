@@ -7,10 +7,14 @@ import type { ShipSpec } from '../ship/shipSpec';
 const BREAKER_THRESHOLD = 0.03;
 // 같은 파도에서 연달아 일으키지 않도록 두는 간격 (초)
 const BREAKER_INTERVAL = 1.2;
-const CAPSIZE_MESSAGE = '전복되었습니다: R 키로 다시 시작';
+const DEFAULT_CAPSIZE_MESSAGE = '전복되었습니다: R 키로 다시 시작';
 
 /** 전복되는 순간과, 부서지는 파도가 선체의 옆면을 때리는 순간을 물보라와 카메라의 흔들림으로 연출한다. */
 export class SeaEffects {
+  /** 뒤집혀 있는 동안 표시하는 문구. 타임어택에서는 다시 출발하는 위치와 벌점을 알리는 문구로 바꾼다. */
+  capsizeMessage = DEFAULT_CAPSIZE_MESSAGE;
+  /** 뒤집히는 순간에 한 번 호출한다. */
+  onCapsize?: () => void;
   private wasCapsized = false;
   private sinceBreaker = Infinity;
 
@@ -31,9 +35,10 @@ export class SeaEffects {
         this.wasCapsized = true;
         this.spray.burst(x, 0.5, z, 1, hull.length * 0.6);
         this.camera.shake(1);
+        this.onCapsize?.();
       }
       // 경고는 일정 시간이 지나면 사라지므로, 뒤집혀 있는 동안에는 계속 다시 표시한다.
-      this.showAlert(CAPSIZE_MESSAGE);
+      this.showAlert(this.capsizeMessage);
       return;
     }
     this.wasCapsized = false;
@@ -45,5 +50,11 @@ export class SeaEffects {
       this.spray.burst(x, 0.5, z, intensity, hull.beam);
       this.camera.shake(intensity * 0.5);
     }
+  }
+
+  /** 문구와 알림을 기본값으로 되돌린다. */
+  resetCapsizeHandling(): void {
+    this.capsizeMessage = DEFAULT_CAPSIZE_MESSAGE;
+    this.onCapsize = undefined;
   }
 }

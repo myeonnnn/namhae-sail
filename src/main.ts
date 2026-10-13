@@ -3,6 +3,8 @@ import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
 import { createStage } from './core/renderer';
+import { COURSES } from './course/course';
+import { LocalRecordStore } from './course/records';
 import { createTimeOfDay, sunPosition } from './environment/sun';
 import { createWeather, updateWeather } from './environment/weather';
 import { windVelocity } from './environment/wind';
@@ -13,14 +15,17 @@ import { ChaseCamera } from './ship/chaseCamera';
 import { ImpactSpray } from './ship/impactSpray';
 import { Ship } from './ship/ship';
 import { SPORT_YACHT } from './ship/shipSpec';
+import { createCourseList } from './ui/courseList';
 import { createDevTools } from './ui/devTools';
 import { Hud } from './ui/hud';
+import { RaceHud } from './ui/raceHud';
 import { SeamarkInspector } from './ui/seamarkInspector';
 import { createStartPointList } from './ui/startPoints';
 import { StartScreen } from './ui/startScreen';
 import { readStartOptions } from './dev/startOptions';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
 import { isOutsideRegion, REGION } from './geo/region';
+import { TimeAttack } from './game/timeAttack';
 import { resolveCollisions } from './sim/collisions';
 import { SeaEffects } from './sim/seaEffects';
 import { loadChart } from './world/chartData';
@@ -28,6 +33,7 @@ import { loadSeamarkRecords } from './world/seamarkData';
 import { Seamarks } from './world/seamarks';
 import { SeaExposure } from './world/seaExposure';
 import { Bridges } from './world/bridges';
+import { CourseGates } from './world/courseGates';
 import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
 
@@ -98,7 +104,11 @@ const impactSpray = new ImpactSpray(scene);
 const MIN_IMPACT_SPEED = 1;
 // 이 속력(m/s)에서 연출의 세기가 최대가 된다.
 const FULL_IMPACT_SPEED = 15;
-let simulationTime = 0;
+// 파도의 시각 (초). 수면의 셰이더와 부력, 부표의 움직임이 모두 이 값을 사용해야 화면과 물리가 일치한다.
+// 루프가 센 시간에서 기준 시각을 뺀 값이며, 타임어택을 시작할 때 기준을 옮겨서 0으로 되돌린다.
+let seaTime = 0;
+let seaClockOrigin = 0;
+let loopElapsed = 0;
 
 /** 충돌한 쪽의 선체 끝에서 물보라를 일으키고 카메라를 흔든다. */
 function playImpact(speed: number, movingAhead: boolean, strength: number): void {
@@ -161,9 +171,35 @@ function placeShip(x: number, z: number, heading: number): void {
   chaseCamera.resetView();
 }
 
+// ---- 타임어택 ----
+const timeAttack = new TimeAttack({
+  ship,
+  weather,
+  hud,
+  raceHud: new RaceHud(document.querySelector<HTMLElement>('#hud')!),
+  gates: new CourseGates(scene),
+  seaEffects,
+  records: new LocalRecordStore(),
+  placeShip,
+  restartSeaClock: () => (seaClockOrigin = loopElapsed),
+});
+
+hud.addSettingsSection(
+  '타임어택',
+  createCourseList(COURSES, {
+    start: (course) => timeAttack.start(course),
+    quit: () => {
+      timeAttack.quit();
+      hud.closeSettings();
+    },
+  }),
+);
+
 hud.addSettingsSection(
   '시작 위치',
   createStartPointList(REGION.starts, (point) => {
+    // 다른 곳으로 옮기면 코스를 벗어나므로, 도전하고 있었으면 그만둔다.
+    timeAttack.quit();
     const { x, z } = latLonToWorld(point);
     placeShip(x, z, degToRad(point.headingDeg));
     hud.closeSettings();
@@ -198,7 +234,7 @@ const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement
 if (DEV_TOOLS) Object.assign(window, { __namhae: { stage, renderer, scene, camera, ship, ocean } });
 
 // ---- 시작 화면 ----
-const startScreen = new StartScreen(document.body);
+const startScreen = new StartScreen(document.body, { timeAttack: () => timeAttack.start(COURSES[0]) });
 if (startOptions.skipIntro) startScreen.dismiss();
 // 선박의 모델과 지도의 자료를 받은 다음에, 주변의 지형이 모두 그려질 때까지 기다린다.
 // 자료를 받지 못해도 시작은 할 수 있어야 하므로 실패는 무시하고, 15초가 지나면 기다리지 않는다.
@@ -207,30 +243,45 @@ let assetsDone = false;
 void assetsLoaded.then(() => (assetsDone = true));
 window.setTimeout(() => startScreen.markReady(), 15000);
 
+// 물리의 한 스텝에서 선박이 이동하기 전의 위치. 관문을 지났는지 판정하는 데 사용한다.
+const stepStart = { x: 0, z: 0 };
+
 startLoop({
   update(dt) {
     // 시작 화면이 떠 있는 동안에는 배가 바람에 밀려서 움직이지 않도록 시간을 멈춘다.
     if (!startScreen.dismissed) return;
     // 관찰 모드에서는 조종에 쓰는 키로 카메라를 움직이므로, 배의 시간을 멈춘다.
     if (observer.active) return;
+    // 카운트다운을 세는 동안에는 배를 세워 둔다.
+    if (timeAttack.frozen) {
+      timeAttack.step(dt, ship.state, ship.state);
+      return;
+    }
+    stepStart.x = ship.state.x;
+    stepStart.z = ship.state.z;
     ship.update(dt, input, windVelocity(wind));
-    simulationTime += dt;
     // 충돌을 처리하면 속도가 0이 되므로, 연출에 사용할 속력을 먼저 기록한다.
     const { surge, sway } = ship.state;
     const impactSpeed = Math.hypot(surge, sway);
     const movingAhead = surge >= 0;
 
-    const collision = resolveCollisions(ship, SHIP, world, simulationTime);
-    if (!collision) return;
-    showAlert(collision.message);
-    if (collision.impact > 0) playImpact(impactSpeed, movingAhead, collision.impact);
+    const collision = resolveCollisions(ship, SHIP, world, seaTime);
+    if (collision) {
+      showAlert(collision.message);
+      if (collision.impact > 0) playImpact(impactSpeed, movingAhead, collision.impact);
+    }
+    // 이번 스텝에 이동한 선분이 관문을 지났는지 확인한다.
+    timeAttack.step(dt, stepStart, ship.state);
   },
   render(frameTime, elapsed) {
     if (assetsDone && terrain.isSettled) startScreen.markReady();
     // 시작 화면이 떠 있는 동안에는 자료를 불러오느라 프레임이 느리므로, 항해를 시작한 뒤부터 해상도를 조절한다.
     if (startScreen.dismissed) stage.adaptResolution(frameTime);
     if (input.isDown('KeyC')) chaseCamera.resetView();
-    if (ship.capsized && input.consumePress('KeyR')) placeShip(restart.x, restart.z, restart.heading);
+    if (ship.capsized && input.consumePress('KeyR')) {
+      if (timeAttack.active) timeAttack.respawn();
+      else placeShip(restart.x, restart.z, restart.heading);
+    }
     if (DEV_TOOLS) {
       if (input.consumePress('KeyF')) setObserver(!observer.active);
       if (input.consumePress('KeyT')) moveShipToObserver();
@@ -239,18 +290,20 @@ startLoop({
     // 지형과 표지, 수면의 격자는 카메라가 보고 있는 곳을 중심으로 불러오고 배치한다.
     const focus = observer.active ? observer : ship.state;
 
-    updateWeather(weather, frameTime);
+    loopElapsed = elapsed;
+    seaTime = elapsed - seaClockOrigin;
+    updateWeather(weather, frameTime, timeAttack.weatherRandom);
     exposure.update(frameTime, focus.x, focus.z, wind.fromDeg, swell.fromDeg);
     updateWaves(wind, swell, exposure, frameTime);
-    ship.syncObject(elapsed, frameTime, windVelocity(wind));
+    ship.syncObject(seaTime, frameTime, windVelocity(wind));
     seaEffects.update(frameTime);
     chaseCamera.update(frameTime, focus);
     terrain.update(focus.x, focus.z);
-    seamarks.update(elapsed, focus.x, focus.z);
-    wake.update(elapsed, ship.state);
+    seamarks.update(seaTime, focus.x, focus.z);
+    wake.update(seaTime, ship.state);
     // 맵의 범위 안에서는 위치에 따른 태양의 차이가 1° 미만이므로, 고정된 기준 지점으로 계산한다.
     ocean.setSun(sunPosition(timeOfDay, WORLD_ORIGIN));
-    ocean.update(elapsed, focus.x, focus.z, camera, canvas.clientHeight, wind);
+    ocean.update(seaTime, focus.x, focus.z, camera, canvas.clientHeight, wind);
     impactSpray.update(frameTime);
     hud.update({
       frameTime,
@@ -265,6 +318,7 @@ startLoop({
       alert,
       focus: observer.active ? observer : undefined,
     });
+    timeAttack.render();
     seamarkInspector.update(camera, ship.state);
     renderer.render(scene, camera);
   },

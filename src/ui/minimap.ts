@@ -19,6 +19,7 @@ import RegularShape from 'ol/style/RegularShape';
 import Stroke from 'ol/style/Stroke';
 import Style from 'ol/style/Style';
 import Text from 'ol/style/Text';
+import type { Course } from '../course/course';
 import { worldToLatLon } from '../geo/projection';
 import { REGION } from '../geo/region';
 import { formatLatLon } from '../geo/units';
@@ -42,6 +43,8 @@ const LABEL_HALO = new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 }
 const DEFAULT_ZOOM = 11;
 const MIN_ZOOM = 7;
 const MAX_ZOOM = 16;
+// 타임어택을 하는 동안의 줌. 관문 사이가 수백 m여서, 지도의 폭에 약 1km가 들어오게 확대한다.
+const COURSE_ZOOM = 15;
 // 이어지는 스크롤에서 줌을 바꾼 뒤에 다음 단계를 허용하기까지의 간격
 const ZOOM_COOLDOWN_MS = 500;
 // 지도의 중심과 자선의 표시를 갱신하는 간격. 매 프레임 갱신하면 육지의 폴리곤을 다시 그리는 비용이 커진다.
@@ -87,6 +90,9 @@ export class Minimap {
   private readonly focusFeature = new Feature(new Point([0, 0]));
   private readonly shipIcon = new Icon({ src: SHIP_ICON, rotateWithView: false });
   private readonly track = new LineString([]);
+  private readonly course = new VectorSource();
+  private nextGate = 0;
+  private zoomBeforeCourse?: number;
   private readonly markStyles = new Map<string, Style>();
   private lastRefreshTime = -Infinity;
   private lastTrackX = Infinity;
@@ -194,6 +200,7 @@ export class Minimap {
           source: marks,
           style: (feature, resolution) => this.markStyle(feature.get('record') as SeamarkRecord, resolution),
         }),
+        new VectorLayer({ source: this.course, style: (feature) => this.courseStyle(feature.get('gate') as number | undefined) }),
         new VectorLayer({
           source: places,
           style: (feature, resolution) => this.placeStyle(feature.get('place') as ChartPlace, resolution),
@@ -224,6 +231,39 @@ export class Minimap {
       },
       { passive: false },
     );
+  }
+
+  /** 타임어택의 경로와 관문을 표시한다. 코스를 지정하지 않으면 지운다. */
+  setCourse(course?: Course): void {
+    this.course.clear();
+    this.nextGate = 0;
+    // 코스가 있는 동안에는 관문이 보이도록 확대하고, 끝나면 보던 줌으로 되돌린다.
+    if (course && this.zoomBeforeCourse === undefined) {
+      this.zoomBeforeCourse = this.view.getZoom() ?? DEFAULT_ZOOM;
+      this.view.setZoom(COURSE_ZOOM);
+    } else if (!course && this.zoomBeforeCourse !== undefined) {
+      this.view.setZoom(this.zoomBeforeCourse);
+      this.zoomBeforeCourse = undefined;
+    }
+    if (!course) return;
+    const toMap = ({ x, z }: { x: number; z: number }) => {
+      const { lat, lon } = worldToLatLon(x, z);
+      return fromLonLat([lon, lat]);
+    };
+    this.course.addFeature(new Feature(new LineString([course.start, ...course.gates].map(toMap))));
+    course.gates.forEach((gate, index) => {
+      const feature = new Feature(new Point(toMap(gate)));
+      feature.set('gate', index);
+      feature.set('finish', gate.finish);
+      this.course.addFeature(feature);
+    });
+  }
+
+  /** 다음에 지나야 하는 관문을 강조한다. */
+  setNextGate(index: number): void {
+    if (index === this.nextGate) return;
+    this.nextGate = index;
+    this.course.changed();
   }
 
   /** 항적을 지운다. 배를 다른 곳으로 옮겼을 때, 이전의 위치와 새 위치가 직선으로 이어지지 않게 한다. */
@@ -298,5 +338,27 @@ export class Minimap {
       this.markStyles.set(key, style);
     }
     return style;
+  }
+
+  /** 코스의 경로(gate가 없음)와 관문의 모양. 다음 관문은 크고 진하게, 이미 지난 관문은 흐리게 그린다. */
+  private courseStyle(gate: number | undefined): Style {
+    if (gate === undefined) {
+      return new Style({ stroke: new Stroke({ color: 'rgba(20, 60, 130, 0.75)', width: 2, lineDash: [7, 5] }) });
+    }
+    const next = gate === this.nextGate;
+    const passed = gate < this.nextGate;
+    return new Style({
+      image: new CircleStyle({
+        radius: next ? 8 : 6,
+        fill: new Fill({ color: next ? '#ff8a1f' : passed ? 'rgba(255, 255, 255, 0.6)' : '#ffffff' }),
+        stroke: new Stroke({ color: passed ? 'rgba(20, 60, 130, 0.4)' : '#143c82', width: next ? 2.5 : 1.5 }),
+      }),
+      text: new Text({
+        text: String(gate + 1),
+        font: '600 10px system-ui, sans-serif',
+        fill: new Fill({ color: passed ? 'rgba(20, 60, 130, 0.5)' : '#0b1a2a' }),
+        offsetY: 0.5,
+      }),
+    });
   }
 }

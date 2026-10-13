@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { TimeOfDay } from '../environment/sun';
+import type { Course } from '../course/course';
 import type { Weather } from '../environment/weather';
 import type { Wind } from '../environment/wind';
 import type { ShipControls, ShipState } from '../ship/shipPhysics';
@@ -53,7 +54,7 @@ export class Hud {
   private readonly environment: EnvironmentPanel;
 
   constructor(
-    root: HTMLElement,
+    private readonly root: HTMLElement,
     private readonly weather: Weather,
     timeOfDay: TimeOfDay,
     radarProbe: RadarProbe,
@@ -132,6 +133,17 @@ export class Hud {
 
   closeSettings(): void {
     this.settings.close();
+  }
+
+  /** 타임어택의 코스를 지도에 표시한다. 코스를 지정하지 않으면 지운다. 도전하는 동안에는 파도의 세기를 바꿀 수 없게 한다. */
+  setCourse(course?: Course): void {
+    this.minimap.setCourse(course);
+    this.root.classList.toggle('hud-racing', course !== undefined);
+  }
+
+  /** 다음에 지나야 하는 관문을 지도에서 강조한다. */
+  setNextGate(index: number): void {
+    this.minimap.setNextGate(index);
   }
 
   /** 배를 다른 곳으로 옮겼을 때 지도의 항적을 지운다. */

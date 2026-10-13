@@ -22,10 +22,12 @@ export class StartScreen {
   private readonly overlay = document.createElement('div');
   private readonly status = document.createElement('div');
   private readonly button = document.createElement('button');
+  private readonly raceButton = document.createElement('button');
   private ready = false;
 
-  constructor(root: HTMLElement) {
-    const { overlay, status, button } = this;
+  /** @param actions.timeAttack 타임어택 버튼을 눌렀을 때 호출한다. 시작 화면을 닫은 다음에 호출된다. */
+  constructor(root: HTMLElement, actions: { timeAttack?: () => void } = {}) {
+    const { overlay, status, button, raceButton } = this;
     overlay.className = 'start-screen';
 
     const card = document.createElement('div');
@@ -76,7 +78,17 @@ export class StartScreen {
     button.hidden = true;
     button.addEventListener('click', () => this.dismiss());
 
+    raceButton.type = 'button';
+    raceButton.className = 'start-secondary';
+    raceButton.textContent = '타임어택 도전';
+    raceButton.hidden = true;
+    raceButton.addEventListener('click', () => {
+      this.dismiss();
+      actions.timeAttack?.();
+    });
+
     card.append(guide, sourcesTitle, sources, status, button);
+    if (actions.timeAttack) card.append(raceButton);
     overlay.append(card);
     root.append(overlay);
 
@@ -92,6 +104,7 @@ export class StartScreen {
     this.ready = true;
     this.status.hidden = true;
     this.button.hidden = false;
+    this.raceButton.hidden = false;
   }
 
   dismiss(): void {

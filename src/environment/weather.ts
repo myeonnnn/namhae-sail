@@ -17,7 +17,10 @@ export function createWeather(): Weather {
   return { wind, swell, sea: createSeaState(wind, swell) };
 }
 
-/** 고른 단계의 범위 안에서 풍속과 너울을 시간에 따라 바꾼다. 매 프레임 호출한다. */
-export function updateWeather({ wind, swell, sea }: Weather, dt: number): void {
-  updateSeaState(sea, wind, swell, dt);
+/**
+ * 고른 단계의 범위 안에서 풍속과 너울을 시간에 따라 바꾼다. 매 프레임 호출한다.
+ * @param random 다음 환경과 머무르는 시간을 정하는 난수. 타임어택에서는 매번 같은 순서로 바뀌도록 고정된 난수를 넘긴다.
+ */
+export function updateWeather({ wind, swell, sea }: Weather, dt: number, random?: () => number): void {
+  updateSeaState(sea, wind, swell, dt, random);
 }

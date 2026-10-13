@@ -926,3 +926,198 @@ body {
 .hud-compass-panel {
   padding: 6px;
 }
+
+/* 타임어택 */
+
+.hud-race {
+  position: absolute;
+  top: var(--hud-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px 18px;
+  /* 다음 관문의 아치가 화면 위쪽 가운데에 나타나므로, 배경을 깔지 않고 글자에 그림자만 두어서 아치를 가리지 않게 한다. */
+  background: none;
+  border: none;
+  backdrop-filter: none;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.85),
+    0 0 12px rgba(0, 0, 0, 0.55);
+}
+
+.hud-race-gates i {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.hud-race-time {
+  font: 600 30px/1.1 var(--hud-font-number);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-race-gates {
+  display: flex;
+  gap: 5px;
+  margin: 3px 0 4px;
+}
+
+/* 관문 하나에 칸 하나: 지난 관문은 채우고, 다음 관문은 주황색으로 강조하고, 도착선은 조금 길게 그린다. */
+.hud-race-gates i {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(232, 241, 248, 0.38);
+}
+
+.hud-race-gates i[data-finish='true'] {
+  width: 30px;
+}
+
+.hud-race-gates i[data-state='passed'] {
+  background: var(--hud-starboard);
+}
+
+.hud-race-gates i[data-state='next'] {
+  background: var(--hud-astern);
+}
+
+.hud-race-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.hud-race-meta svg {
+  fill: var(--hud-astern);
+}
+
+.hud-race-meta span:last-child:not(:empty) {
+  color: var(--hud-port);
+}
+
+/* 도전하는 동안에는 경고를 시간 표시의 아래에 두고, 코스에 정해진 파도의 세기를 바꾸지 못하게 한다. */
+.hud-racing .hud-alert {
+  top: calc(var(--hud-margin) + 100px);
+}
+
+.hud-racing .hud-sea-levels {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.hud-race-banner {
+  position: absolute;
+  top: 21%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font: 800 120px/1 var(--hud-font);
+  letter-spacing: 0.02em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  animation: hud-race-pop 0.9s ease-out both;
+}
+
+.hud-race-banner[data-kind='go'] {
+  color: var(--hud-starboard);
+}
+
+.hud-race-banner[data-kind='finish'] {
+  color: #ffd84a;
+  font-size: 96px;
+  animation-duration: 2.2s;
+}
+
+@keyframes hud-race-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.hud-race-result {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  padding: 20px 22px;
+  pointer-events: auto;
+  text-align: center;
+}
+
+.hud-race-result h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.hud-race-result-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  align-items: baseline;
+  margin: 16px 0 12px;
+  text-align: left;
+}
+
+.hud-race-result-grid .hud-value {
+  text-align: right;
+}
+
+.hud-race-result-grid .hud-race-total {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.hud-race-best {
+  margin: 0 0 16px;
+  color: var(--hud-text-muted);
+  font-size: 12px;
+}
+
+.hud-race-best[data-improved='true'] {
+  color: #ffd84a;
+  font-weight: 600;
+}
+
+.hud-race-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#hud .hud-race-actions button {
+  padding: 8px;
+}
+
+#hud .hud-race-actions .hud-race-primary {
+  background: var(--hud-ahead);
+  border-color: var(--hud-ahead);
+  color: #0b1a2a;
+  font-weight: 600;
+}
+
+#hud .hud-start-points .hud-course-quit {
+  display: block;
+  color: var(--hud-text-muted);
+  text-align: center;
+}
+
+.start-card .start-secondary {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--hud-ahead);
+  color: var(--hud-ahead);
+}
