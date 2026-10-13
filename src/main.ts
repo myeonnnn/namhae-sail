@@ -3,10 +3,9 @@ import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
 import { createStage } from './core/renderer';
-import { createSeaState, updateSeaState } from './environment/seaState';
 import { createTimeOfDay, sunPosition } from './environment/sun';
-import { createSwell } from './environment/swell';
-import { createWind, windVelocity } from './environment/wind';
+import { createWeather, updateWeather } from './environment/weather';
+import { windVelocity } from './environment/wind';
 import { Ocean } from './ocean/ocean';
 import { Wake } from './ocean/wake';
 import { updateWaves } from './ocean/waves';
@@ -23,10 +22,11 @@ import { readStartOptions } from './dev/startOptions';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
 import { isOutsideRegion, REGION } from './geo/region';
 import { resolveCollisions } from './sim/collisions';
+import { SeaEffects } from './sim/seaEffects';
 import { loadChart } from './world/chartData';
 import { loadSeamarkRecords } from './world/seamarkData';
 import { Seamarks } from './world/seamarks';
-import { OPEN_SEA_FETCH, Shelter } from './world/shelter';
+import { SeaExposure } from './world/seaExposure';
 import { Bridges } from './world/bridges';
 import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
@@ -46,9 +46,10 @@ const stage = createStage(canvas);
 const { renderer, scene, camera } = stage;
 
 const input = new Input();
-const wind = createWind();
-const swell = createSwell();
-const sea = createSeaState(wind, swell);
+const weather = createWeather();
+const { wind, swell } = weather;
+// 파도가 자라는 조건 가운데 위치에 따라 달라지는 값. 섬에 가려진 곳에서는 파도가 낮아진다.
+const exposure = new SeaExposure();
 const timeOfDay = createTimeOfDay();
 const wake = new Wake(renderer, SHIP.model);
 const ocean = new Ocean(scene, renderer, wake);
@@ -68,7 +69,7 @@ const seamarks = new Seamarks(scene, (x, z) => structures.topNear(x, z, 8) ?? te
 
 const chaseCamera = new ChaseCamera(camera, canvas, SHIP.camera);
 chaseCamera.alignTo(ship.state.heading);
-const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, { wind, swell, sea }, timeOfDay, {
+const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, weather, timeOfDay, {
   // 레이더에 넓은 물체로 표시하는 것: 육지, 방파제와 부두, 그리고 선박이 지나갈 수 없을 만큼 낮은 다리.
   // 아래로 지나갈 수 있는 다리의 상판은 장애물이 아니므로 표시하지 않고, 실제로 부딪히는 교각만 점으로 표시한다.
   isSolid: (x, z) =>
@@ -92,17 +93,6 @@ const syncBottomInset = () => stage.setBottomInset(hud.consoleHeight);
 window.addEventListener('resize', syncBottomInset);
 syncBottomInset();
 
-// 파도가 자라는 조건 가운데 위치에 따라 달라지는 값. 섬에 가려진 곳에서는 파도가 낮아진다.
-// 육지의 격자를 받기 전에는 열린 바다로 가정한다.
-const exposure = { fetch: OPEN_SEA_FETCH, swellFetch: OPEN_SEA_FETCH };
-let shelter: Shelter | undefined;
-void Shelter.load()
-  .then((loaded) => (shelter = loaded))
-  .catch((error) => console.warn('육지의 격자를 만들지 못했습니다. 파도가 섬에 가려지지 않습니다.', error));
-// 수십 km를 따라가며 재는 계산이고 배는 그 사이에 얼마 움직이지 않으므로, 이 간격(초)으로만 다시 잰다.
-const EXPOSURE_INTERVAL = 0.5;
-let exposureAge = Infinity;
-
 const impactSpray = new ImpactSpray(scene);
 // 이 속력(m/s)보다 느린 접촉은 연출 없이 경고만 표시한다. 육지에 닿은 채로 밀고 있을 때 매 스텝 반복되는 것을 막는다.
 const MIN_IMPACT_SPEED = 1;
@@ -122,33 +112,7 @@ function playImpact(speed: number, movingAhead: boolean, strength: number): void
 
 // 배가 뒤집혔을 때 되돌아갈 위치. 마지막으로 배를 놓은 곳이다.
 const restart = { x: ship.state.x, z: ship.state.z, heading: ship.state.heading };
-let wasCapsized = false;
-// 부서지는 마루가 선체를 때리는 세기가 이 값을 넘으면 물보라를 일으킨다. 같은 파도에서 연달아 일으키지 않도록 간격(초)을 둔다.
-const BREAKER_SPRAY_THRESHOLD = 0.03;
-const BREAKER_SPRAY_INTERVAL = 1.2;
-let breakerSprayAge = Infinity;
-
-/** 전복되는 순간과, 부서지는 파도가 선체의 옆면을 때리는 순간을 연출한다. */
-function playSeaEffects(frameTime: number): void {
-  const { x, z } = ship.state;
-  if (ship.capsized) {
-    if (!wasCapsized) {
-      wasCapsized = true;
-      impactSpray.burst(x, 0.5, z, 1, SHIP.model.length * 0.6);
-      chaseCamera.shake(1);
-    }
-    // 경고는 일정 시간이 지나면 사라지므로, 뒤집혀 있는 동안에는 계속 다시 표시한다.
-    showAlert('전복되었습니다: R 키로 다시 시작');
-    return;
-  }
-  breakerSprayAge += frameTime;
-  if (ship.breaking > BREAKER_SPRAY_THRESHOLD && breakerSprayAge > BREAKER_SPRAY_INTERVAL) {
-    breakerSprayAge = 0;
-    const intensity = Math.min(ship.breaking / (BREAKER_SPRAY_THRESHOLD * 4), 1);
-    impactSpray.burst(x, 0.5, z, intensity, SHIP.model.beam);
-    chaseCamera.shake(intensity * 0.5);
-  }
-}
+const seaEffects = new SeaEffects(ship, SHIP.model, impactSpray, chaseCamera, showAlert);
 
 function degToRad(degrees: number): number {
   return (degrees * Math.PI) / 180;
@@ -185,7 +149,6 @@ function moveShipToObserver(): void {
 function placeShip(x: number, z: number, heading: number): void {
   Object.assign(ship.state, { x, z, heading, surge: 0, sway: 0, yawRate: 0 });
   ship.recover();
-  wasCapsized = false;
   Object.assign(restart, { x, z, heading });
   ship.controls.throttle = 0;
   ship.controls.rudder = 0;
@@ -276,16 +239,11 @@ startLoop({
     // 지형과 표지, 수면의 격자는 카메라가 보고 있는 곳을 중심으로 불러오고 배치한다.
     const focus = observer.active ? observer : ship.state;
 
-    exposureAge += frameTime;
-    if (shelter && exposureAge >= EXPOSURE_INTERVAL) {
-      exposureAge = 0;
-      exposure.fetch = shelter.fetch(focus.x, focus.z, wind.fromDeg);
-      exposure.swellFetch = shelter.fetch(focus.x, focus.z, swell.fromDeg);
-    }
-    updateSeaState(sea, wind, swell, frameTime);
+    updateWeather(weather, frameTime);
+    exposure.update(frameTime, focus.x, focus.z, wind.fromDeg, swell.fromDeg);
     updateWaves(wind, swell, exposure, frameTime);
     ship.syncObject(elapsed, frameTime, windVelocity(wind));
-    playSeaEffects(frameTime);
+    seaEffects.update(frameTime);
     chaseCamera.update(frameTime, focus);
     terrain.update(focus.x, focus.z);
     seamarks.update(elapsed, focus.x, focus.z);

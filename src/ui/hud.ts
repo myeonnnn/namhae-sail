@@ -1,9 +1,10 @@
 import type * as THREE from 'three';
 import type { TimeOfDay } from '../environment/sun';
+import type { Weather } from '../environment/weather';
 import type { Wind } from '../environment/wind';
 import type { ShipControls, ShipState } from '../ship/shipPhysics';
 import { Compass } from './compass';
-import { EnvironmentPanel, type Weather } from './environmentPanel';
+import { EnvironmentPanel } from './environmentPanel';
 import { Instruments } from './instruments';
 import { createKeyGuide } from './keyGuide';
 import { Minimap } from './minimap';
