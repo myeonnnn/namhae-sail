@@ -7,10 +7,9 @@ import type { ShipControls, ShipState } from '../ship/shipPhysics';
 import { Compass } from './compass';
 import { EnvironmentPanel } from './environmentPanel';
 import { Instruments } from './instruments';
-import { createKeyGuide } from './keyGuide';
 import { Minimap } from './minimap';
 import { Radar, type RadarProbe } from './radar';
-import { SettingsMenu } from './settingsMenu';
+import { DropdownMenu } from './dropdownMenu';
 
 // 충돌이 해소된 뒤에도 경고를 잠시 유지해서, 깜빡이지 않고 읽을 수 있게 한다.
 const ALERT_HOLD_MS = 1500;
@@ -39,9 +38,15 @@ export interface HudFrame {
   focus?: { x: number; z: number };
 }
 
+/** 왼쪽 위에 나란히 놓는 메뉴 */
+export type MenuId = 'race' | 'start' | 'help' | 'dev';
+const MENU_LABELS: Record<MenuId, string> = { race: '타임어택', start: '시작 위치', help: '도움말', dev: '개발 도구' };
+// 왼쪽부터 놓는 순서
+const MENU_ORDER: MenuId[] = ['race', 'start', 'help', 'dev'];
+
 /**
  * 화면 위의 표시 장치를 배치한다.
- * 아래쪽 가운데에는 지도와 레이더, 계기판을 나란히 붙여서 두고, 왼쪽 위에는 설정 메뉴를, 오른쪽 위에는 환경을,
+ * 아래쪽 가운데에는 지도와 레이더, 계기판을 나란히 붙여서 두고, 왼쪽 위에는 역할별 메뉴를, 오른쪽 위에는 환경을,
  * 위쪽 가운데에는 경고를 둔다.
  */
 export class Hud {
@@ -54,7 +59,8 @@ export class Hud {
   private tipUntil = 0;
   private readonly bottom = document.createElement('div');
   private readonly modeHint = document.createElement('div');
-  private readonly settings: SettingsMenu;
+  private readonly menuBar = document.createElement('div');
+  private readonly menus: Partial<Record<MenuId, DropdownMenu>> = {};
   private readonly environment: EnvironmentPanel;
 
   constructor(
@@ -80,8 +86,9 @@ export class Hud {
 
     this.instruments = new Instruments(bottom);
 
-    this.settings = new SettingsMenu(root);
-    this.settings.addSection('조작키', createKeyGuide(), true);
+    // 왼쪽 위의 메뉴는 역할별로 나눈다. 개발 도구의 메뉴는 구역이 추가될 때에만 만들어지므로, 배포한 화면에는 나타나지 않는다.
+    this.menuBar.className = 'hud-menus';
+    root.append(this.menuBar);
 
     const right = document.createElement('div');
     right.className = 'hud-column hud-column-right';
@@ -132,13 +139,23 @@ export class Hud {
     this.bottom.style.setProperty('--hud-console-scale', scale.toFixed(3));
   }
 
-  /** 설정 메뉴에 구역을 추가한다. */
-  addSettingsSection(title: string, content: HTMLElement): void {
-    this.settings.addSection(title, content);
+  /** 왼쪽 위의 메뉴에, 제목을 누르면 펼쳐지는 구역을 추가한다. 내용이 여러 가지인 메뉴에 사용한다. */
+  addMenuSection(menu: MenuId, title: string, content: HTMLElement, expanded = false): void {
+    this.menu(menu).addSection(title, content, expanded);
   }
 
-  closeSettings(): void {
-    this.settings.close();
+  /** 왼쪽 위의 메뉴에 내용을 제목 없이 그대로 넣는다. 내용이 한 가지뿐인 메뉴에 사용한다. */
+  setMenuContent(menu: MenuId, content: HTMLElement): void {
+    this.menu(menu).setContent(content);
+  }
+
+  /** 메뉴가 아직 없으면 만든다. 개발 도구의 메뉴가 배포한 화면에 나타나지 않는 것은, 그 내용을 넣는 코드가 실행되지 않기 때문이다. */
+  private menu(id: MenuId): DropdownMenu {
+    return (this.menus[id] ??= new DropdownMenu(this.menuBar, MENU_LABELS[id], MENU_ORDER.indexOf(id)));
+  }
+
+  closeMenus(): void {
+    for (const menu of Object.values(this.menus)) menu.close();
   }
 
   /** 조종 요령의 조언을 조작대의 바로 위에 한 줄로 잠시 표시한다. */

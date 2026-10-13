@@ -27,7 +27,7 @@ function tachArc(from: number, to: number): string {
   return `M ${point(from)} A ${TACH_RADIUS} ${TACH_RADIUS} 0 ${largeArc} 1 ${point(to)}`;
 }
 
-/** 조종하는 동안 계속 확인하는 값을 모은 계기판. 아래쪽에는 조종에 쓰는 기본 키만 표시하고, 전체 목록은 설정 메뉴에 둔다. */
+/** 조종하는 동안 계속 확인하는 값을 모은 계기판. 아래쪽에는 조종에 쓰는 기본 키만 표시하고, 전체 목록은 도움말 메뉴에 둔다. */
 export class Instruments {
   private readonly speed: HTMLElement;
   private readonly heading: HTMLElement;

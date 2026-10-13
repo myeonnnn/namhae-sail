@@ -19,6 +19,7 @@ import { createCourseList } from './ui/courseList';
 import { createButton } from './ui/dom';
 import { createDevTools } from './ui/devTools';
 import { Guide } from './ui/guide';
+import { createKeyGuide } from './ui/keyGuide';
 import { Hud } from './ui/hud';
 import { RaceHud } from './ui/raceHud';
 import { SeamarkInspector } from './ui/seamarkInspector';
@@ -43,7 +44,7 @@ import { Terrain } from './world/terrain';
 // 조종할 선박. shipSpec.ts에 정의된 다른 선박으로 바꾸면 모델과 조종 특성, 카메라의 거리가 함께 바뀐다.
 const SHIP = SPORT_YACHT;
 
-// 운영 구역의 첫 번째 시작 지점에서 시작한다. 나머지 지점은 설정 메뉴에서 골라서 이동할 수 있다.
+// 운영 구역의 첫 번째 시작 지점에서 시작한다. 나머지 지점은 시작 위치 메뉴에서 골라서 이동할 수 있다.
 const START = REGION.starts[0];
 
 // 개발 도구(관찰 모드, 배의 순간 이동, 장소로 바로 이동, 주소로 시작 위치 지정)는 로컬의 개발 서버에서만 켠다.
@@ -177,16 +178,19 @@ function placeShip(x: number, z: number, heading: number): void {
 // ---- 가이드와 조언 ----
 const guide = new Guide(document.body);
 const coach = new Coach();
-hud.addSettingsSection(
+hud.addMenuSection(
+  'help',
   '항해 가이드',
   createButton({
     content: '계기판을 읽는 법과 거친 바다의 요령',
     onClick: () => {
-      hud.closeSettings();
+      hud.closeMenus();
       guide.open();
     },
   }),
+  true,
 );
+hud.addMenuSection('help', '조작키', createKeyGuide(), true);
 
 // ---- 타임어택 ----
 const timeAttack = new TimeAttack({
@@ -201,31 +205,31 @@ const timeAttack = new TimeAttack({
   restartSeaClock: () => (seaClockOrigin = loopElapsed),
 });
 
-hud.addSettingsSection(
-  '타임어택',
+hud.setMenuContent(
+  'race',
   createCourseList(COURSES, {
     start: (course) => timeAttack.start(course),
     quit: () => {
       timeAttack.quit();
-      hud.closeSettings();
+      hud.closeMenus();
     },
   }),
 );
 
-hud.addSettingsSection(
-  '시작 위치',
+hud.setMenuContent(
+  'start',
   createStartPointList(REGION.starts, (point) => {
     // 다른 곳으로 옮기면 코스를 벗어나므로, 도전하고 있었으면 그만둔다.
     timeAttack.quit();
     const { x, z } = latLonToWorld(point);
     placeShip(x, z, degToRad(point.headingDeg));
-    hud.closeSettings();
+    hud.closeMenus();
   }),
 );
 
 if (DEV_TOOLS) {
-  hud.addSettingsSection(
-    '개발 도구',
+  hud.setMenuContent(
+    'dev',
     createDevTools(
       loadChart().then((chart) => chart.places),
       {

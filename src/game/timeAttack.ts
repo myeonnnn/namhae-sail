@@ -69,7 +69,7 @@ export class TimeAttack {
     host.restartSeaClock();
     host.gates.show(course);
     host.hud.setCourse(course);
-    host.hud.closeSettings();
+    host.hud.closeMenus();
     host.raceHud.show(course);
     host.seaEffects.capsizeMessage = `전복: R 키로 마지막 관문에서 다시 출발 (+${CAPSIZE_PENALTY}초)`;
     host.seaEffects.onCapsize = () => this.race?.capsize();

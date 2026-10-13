@@ -1,7 +1,7 @@
 import { latLonToWorld } from './projection';
 import config from './region.json';
 
-/** 설정 메뉴에서 고를 수 있는 시작 위치 */
+/** 시작 위치 메뉴에서 고를 수 있는 시작 위치 */
 export interface StartPoint {
   name: string;
   /** 어떤 곳인지 알려 주는 짧은 설명 */

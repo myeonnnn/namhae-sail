@@ -2,7 +2,7 @@ import type { Course } from '../course/course';
 import { createButton } from './dom';
 
 /**
- * 설정 메뉴에 넣는 타임어택의 코스 목록. 코스를 누르면 그 코스에 도전하고, 아래의 버튼으로 그만둔다.
+ * 타임어택 메뉴에 넣는 타임어택의 코스 목록. 코스를 누르면 그 코스에 도전하고, 아래의 버튼으로 그만둔다.
  */
 export function createCourseList(
   courses: Course[],

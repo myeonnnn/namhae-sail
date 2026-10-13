@@ -456,33 +456,57 @@ body {
   margin-right: 5px;
 }
 
-/* 설정 메뉴 */
+/* 왼쪽 위의 메뉴 */
 
-.hud-settings {
+/* 왼쪽 위에 나란히 놓는 메뉴의 버튼들 */
+.hud-menus {
   position: absolute;
   top: var(--hud-margin);
   left: var(--hud-margin);
+  display: flex;
+  gap: 6px;
   pointer-events: auto;
 }
 
-#hud .hud-settings-button {
-  width: 34px;
-  height: 34px;
-  background: var(--hud-surface);
-  backdrop-filter: blur(6px);
+.hud-menu {
+  position: relative;
 }
 
-.hud-settings-dropdown {
-  min-width: 220px;
+#hud .hud-menu-button {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--hud-surface);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* 메뉴가 열려 있는 동안에는 버튼을 눌린 상태로 표시한다. */
+#hud .hud-menu-button[aria-expanded='true'] {
+  background: var(--hud-ahead);
+  border-color: var(--hud-ahead);
+  color: #0b1a2a;
+}
+
+/* 제목 없이 내용만 있는 메뉴 */
+.hud-menu-content.hud-menu-single {
+  padding: 8px;
+}
+
+.hud-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 240px;
   margin-top: 6px;
   padding: 4px;
 }
 
-.hud-settings-section + .hud-settings-section {
+.hud-menu-section + .hud-menu-section {
   border-top: 1px solid var(--hud-border);
 }
 
-#hud .hud-settings-header {
+#hud .hud-menu-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -495,12 +519,12 @@ body {
   text-align: left;
 }
 
-#hud .hud-settings-header:hover {
+#hud .hud-menu-header:hover {
   background: rgba(232, 241, 248, 0.1);
 }
 
 /* 구역이 펼쳐져 있으면 위쪽을, 접혀 있으면 아래쪽을 가리키는 화살표 */
-.hud-settings-header::after {
+.hud-menu-header::after {
   content: '';
   width: 6px;
   height: 6px;
@@ -510,11 +534,11 @@ body {
   opacity: 0.7;
 }
 
-.hud-settings-header[aria-expanded='true']::after {
+.hud-menu-header[aria-expanded='true']::after {
   transform: rotate(-135deg) translate(-2px, -2px);
 }
 
-.hud-settings-content {
+.hud-menu-content {
   padding: 2px 10px 10px;
 }
 
@@ -706,7 +730,7 @@ body {
   text-align: center;
 }
 
-/* 설정 메뉴의 개발 도구 */
+/* 개발 도구 메뉴 */
 
 .hud-devtools {
   display: grid;
@@ -862,7 +886,7 @@ body {
   display: none;
 }
 
-/* 설정 메뉴의 시작 위치 목록 */
+/* 시작 위치와 타임어택 메뉴의 목록 */
 
 .hud-start-points {
   display: grid;

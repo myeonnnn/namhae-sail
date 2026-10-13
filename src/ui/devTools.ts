@@ -14,7 +14,7 @@ const PLACE_KINDS: ReadonlyArray<[ChartPlace['kind'], string]> = [
 ];
 
 /**
- * 설정 메뉴에 넣는 개발 도구: 관찰 모드를 켜고 끄는 버튼, 배를 옮기는 버튼, 장소로 바로 이동하는 목록.
+ * 개발 도구 메뉴에 넣는 개발 도구: 관찰 모드를 켜고 끄는 버튼, 배를 옮기는 버튼, 장소로 바로 이동하는 목록.
  * 구역의 여러 곳을 확인할 때 배를 직접 몰고 가지 않아도 되게 한다.
  */
 export function createDevTools(places: Promise<ChartPlace[]>, actions: DevToolsActions): HTMLElement {
