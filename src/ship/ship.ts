@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Input } from '../core/input';
-import { sampleWaveHeight } from '../ocean/waves';
+import { stepRoll, type RollState } from './rollDynamics';
+import { measureSeaLoad } from './seakeeping';
 import { createShipState, stepShip, type ShipControls, type ShipState } from './shipPhysics';
 import type { ShipSpec } from './shipSpec';
 
-// 선체의 길이와 폭에 대한 비율로 표현한 수면의 측정 위치
-const HULL_SAMPLES_ALONG = [-0.42, -0.28, -0.14, 0, 0.14, 0.28, 0.42];
-const HULL_SAMPLES_ACROSS = [-0.35, 0, 0.35];
+// 뒤집힌 선체의 감쇠비와, 물에 잠긴 선체가 멈추는 빠르기 (1/s)
+const CAPSIZED_DAMPING = 0.6;
+const CAPSIZED_DRAG = 0.8;
 // 육지와의 접촉을 검사하는 지점: 선수, 선수 좌우, 중앙 좌우, 선미
 const HULL_CONTACT_POINTS = [
   [0.48, 0],
@@ -27,12 +28,16 @@ export class Ship {
   readonly ready: Promise<void>;
   /** 엔진의 회전수 (rpm). 스로틀을 조금 늦게 따라간다. */
   rpm: number;
+  /** 선체가 뒤집혔으면 true. recover를 호출하기 전까지는 조종할 수 없다. */
+  capsized = false;
+  /** 부서지는 마루가 선체의 옆면을 때리는 세기 (0 이상). 연출에 사용한다. */
+  breaking = 0;
   private heave = 0;
   private previousX = 0;
   private previousZ = 0;
   private previousHeading = 0;
   private pitch = 0;
-  private roll = 0;
+  private readonly roll: RollState = { angle: 0, rate: 0 };
 
   constructor(private readonly spec: ShipSpec) {
     this.rpm = spec.engine.idleRpm;
@@ -42,6 +47,21 @@ export class Ship {
 
   update(dt: number, input: Input, wind: { x: number; z: number }): void {
     const { controls, spec } = this;
+
+    if (this.capsized) {
+      // 뒤집힌 배는 엔진이 멈추고, 물의 저항으로 곧 멈춘다. 바람과 파도에 밀리는 움직임만 남는다.
+      controls.throttle = 0;
+      controls.rudder = 0;
+      this.rpm += (0 - this.rpm) * (1 - Math.exp(-spec.engine.response * dt));
+      const drag = Math.exp(-CAPSIZED_DRAG * dt);
+      this.state.surge *= drag;
+      this.state.yawRate *= drag;
+      this.previousX = this.state.x;
+      this.previousZ = this.state.z;
+      this.previousHeading = this.state.heading;
+      stepShip(this.state, controls, spec.physics, wind, dt);
+      return;
+    }
 
     // 스로틀은 레버처럼 놓은 위치에 머무르고, 타는 키를 놓으면 중앙으로 복귀한다.
     const throttleInput = input.axis(['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']);
@@ -64,6 +84,19 @@ export class Ship {
     this.previousZ = this.state.z;
     this.previousHeading = this.state.heading;
     stepShip(this.state, controls, spec.physics, wind, dt);
+  }
+
+  /** 횡경사 (rad). 우현 쪽으로 기울어지면 양수이다. 파도와 선회에 의한 기울기가 모두 포함된다. */
+  get heel(): number {
+    return -this.roll.angle;
+  }
+
+  /** 뒤집힌 선체를 바로 세운다. 배를 다시 배치할 때 호출한다. */
+  recover(): void {
+    this.capsized = false;
+    this.breaking = 0;
+    this.roll.angle = 0;
+    this.roll.rate = 0;
   }
 
   /**
@@ -96,50 +129,34 @@ export class Ship {
   }
 
   /**
-   * 물리 상태를 메시에 반영하고, 선체 아래의 수면을 읽어서 상하 움직임과 기울기를 계산한다.
+   * 물리 상태를 메시에 반영하고, 선체 아래의 수면과 바람을 읽어서 상하 움직임과 기울기를 계산한다.
    * elapsed는 수면의 셰이더에 전달하는 시간과 동일해야 한다.
+   *
+   * @param wind 바람이 공기를 이동시키는 속도 (월드 좌표, m/s)
    */
-  syncObject(elapsed: number, frameTime: number): void {
+  syncObject(elapsed: number, frameTime: number, wind: { x: number; z: number }): void {
     const { state, object, spec } = this;
-    const sin = Math.sin(state.heading);
-    const cos = Math.cos(state.heading);
+    const load = measureSeaLoad(spec, state, wind, elapsed);
 
-    // 선체의 수선면에 격자 모양으로 점을 찍고, 각 점에서 읽은 수면의 높이에 평면을 맞춘다.
-    // 평면의 평균 높이가 상하 움직임이 되고, 앞뒤 기울기와 좌우 기울기가 각각 종동요와 횡동요가 된다.
-    let heightSum = 0;
-    let alongMoment = 0;
-    let alongSquare = 0;
-    let acrossMoment = 0;
-    let acrossSquare = 0;
-    for (const along of HULL_SAMPLES_ALONG) {
-      for (const across of HULL_SAMPLES_ACROSS) {
-        const forward = along * spec.model.length;
-        const starboard = across * spec.model.beam;
-        const height = sampleWaveHeight(
-          state.x + forward * sin + starboard * cos,
-          state.z - forward * cos + starboard * sin,
-          elapsed,
-        );
-        heightSum += height;
-        alongMoment += forward * height;
-        alongSquare += forward * forward;
-        acrossMoment += starboard * height;
-        acrossSquare += starboard * starboard;
-      }
-    }
-    const sampleCount = HULL_SAMPLES_ALONG.length * HULL_SAMPLES_ACROSS.length;
-    const targetHeave = heightSum / sampleCount;
-    const targetPitch = Math.atan(alongMoment / alongSquare);
-    const targetRoll = Math.atan(acrossMoment / acrossSquare) * spec.motion.rollRatio;
-
-    // 무거운 선체는 수면의 변화를 즉시 따라가지 못하므로 지수 감쇠로 지연시킨다.
+    // 상하 움직임과 앞뒤 기울기는 수면을 조금 늦게 따라간다. 무거운 선체는 수면의 변화를 즉시 따라가지 못한다.
     const blend = 1 - Math.exp(-spec.motion.waveResponse * frameTime);
-    this.heave += (targetHeave - this.heave) * blend;
-    this.pitch += (targetPitch - this.pitch) * blend;
-    this.roll += (targetRoll - this.roll) * blend;
+    this.heave += (load.heave - this.heave) * blend;
+    this.pitch += (load.pitch - this.pitch) * blend;
+
+    // 좌우 기울기는 관성을 가지고 흔들린다. 파도를 옆으로 받으면 크게 흔들리고, 선수로 받으면 거의 흔들리지 않는다.
+    // 뒤집힌 선체는 넓은 갑판이 물에 잠겨서 흔들림이 금방 잦아든다.
+    const params = this.capsized ? { ...spec.motion.roll, damping: CAPSIZED_DAMPING } : spec.motion.roll;
+    const speed = Math.hypot(state.surge, state.sway);
+    stepRoll(this.roll, load.surfaceSlope, this.capsized ? 0 : load.heeling, params, speed, frameTime);
+    this.breaking = this.capsized ? 0 : load.breaking;
+
+    // 수면에 대한 기울기가 복원력이 사라지는 각도를 넘으면 되돌아오지 못한다.
+    if (!this.capsized && Math.abs(this.roll.angle - load.surfaceSlope) > spec.motion.roll.vanishingAngle) {
+      this.capsized = true;
+    }
 
     object.position.set(state.x, this.heave, state.z);
-    object.rotation.set(this.pitch, -state.heading, this.roll + spec.motion.heelGain * state.yawRate * state.surge);
+    object.rotation.set(this.pitch, -state.heading, this.roll.angle);
   }
 
   private async loadModel(): Promise<void> {

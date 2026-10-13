@@ -120,6 +120,36 @@ function playImpact(speed: number, movingAhead: boolean, strength: number): void
   chaseCamera.shake(intensity);
 }
 
+// 배가 뒤집혔을 때 되돌아갈 위치. 마지막으로 배를 놓은 곳이다.
+const restart = { x: ship.state.x, z: ship.state.z, heading: ship.state.heading };
+let wasCapsized = false;
+// 부서지는 마루가 선체를 때리는 세기가 이 값을 넘으면 물보라를 일으킨다. 같은 파도에서 연달아 일으키지 않도록 간격(초)을 둔다.
+const BREAKER_SPRAY_THRESHOLD = 0.03;
+const BREAKER_SPRAY_INTERVAL = 1.2;
+let breakerSprayAge = Infinity;
+
+/** 전복되는 순간과, 부서지는 파도가 선체의 옆면을 때리는 순간을 연출한다. */
+function playSeaEffects(frameTime: number): void {
+  const { x, z } = ship.state;
+  if (ship.capsized) {
+    if (!wasCapsized) {
+      wasCapsized = true;
+      impactSpray.burst(x, 0.5, z, 1, SHIP.model.length * 0.6);
+      chaseCamera.shake(1);
+    }
+    // 경고는 일정 시간이 지나면 사라지므로, 뒤집혀 있는 동안에는 계속 다시 표시한다.
+    showAlert('전복되었습니다: R 키로 다시 시작');
+    return;
+  }
+  breakerSprayAge += frameTime;
+  if (ship.breaking > BREAKER_SPRAY_THRESHOLD && breakerSprayAge > BREAKER_SPRAY_INTERVAL) {
+    breakerSprayAge = 0;
+    const intensity = Math.min(ship.breaking / (BREAKER_SPRAY_THRESHOLD * 4), 1);
+    impactSpray.burst(x, 0.5, z, intensity, SHIP.model.beam);
+    chaseCamera.shake(intensity * 0.5);
+  }
+}
+
 function degToRad(degrees: number): number {
   return (degrees * Math.PI) / 180;
 }
@@ -154,6 +184,9 @@ function moveShipToObserver(): void {
 /** 배를 지정한 위치에 정지한 상태로 놓는다. */
 function placeShip(x: number, z: number, heading: number): void {
   Object.assign(ship.state, { x, z, heading, surge: 0, sway: 0, yawRate: 0 });
+  ship.recover();
+  wasCapsized = false;
+  Object.assign(restart, { x, z, heading });
   ship.controls.throttle = 0;
   ship.controls.rudder = 0;
   // 이전의 위치에서 새 위치까지 항적이 이어지지 않도록 기록을 지운다.
@@ -229,6 +262,7 @@ startLoop({
   render(frameTime, elapsed) {
     if (assetsDone && terrain.isSettled) startScreen.markReady();
     if (input.isDown('KeyC')) chaseCamera.resetView();
+    if (ship.capsized && input.consumePress('KeyR')) placeShip(restart.x, restart.z, restart.heading);
     if (DEV_TOOLS) {
       if (input.consumePress('KeyF')) setObserver(!observer.active);
       if (input.consumePress('KeyT')) moveShipToObserver();
@@ -245,7 +279,8 @@ startLoop({
     }
     updateSeaState(sea, wind, swell, frameTime);
     updateWaves(wind, swell, exposure, frameTime);
-    ship.syncObject(elapsed, frameTime);
+    ship.syncObject(elapsed, frameTime, windVelocity(wind));
+    playSeaEffects(frameTime);
     chaseCamera.update(frameTime, focus);
     terrain.update(focus.x, focus.z);
     seamarks.update(elapsed, focus.x, focus.z);
@@ -261,6 +296,7 @@ startLoop({
       controls: ship.controls,
       wind,
       engine: { rpm: ship.rpm, maxRpm: SHIP.engine.maxRpm },
+      heel: ship.heel,
       fetch: exposure.fetch,
       shipLength: SHIP.model.length,
       alert,

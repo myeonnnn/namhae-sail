@@ -1,3 +1,5 @@
+import type { RollParams } from './rollDynamics';
+
 /** 선박 한 종류의 외형과 조종 특성을 정의한다. 힘은 모두 질량으로 나눈 가속도 단위이다. */
 export interface ShipSpec {
   model: {
@@ -50,8 +52,14 @@ export interface ShipSpec {
     heelGain: number;
     /** 선체가 수면의 변화를 따라가는 빠르기 (1/s). 값이 작을수록 무겁고 둔하게 움직인다. */
     waveResponse: number;
-    /** 수면의 좌우 기울기 중에서 선체의 횡동요로 반영하는 비율 */
+    /** 수면의 좌우 기울기 중에서 선체를 기울이는 힘으로 작용하는 비율 */
     rollRatio: number;
+    /** 횡동요의 주기와 감쇠 */
+    roll: RollParams;
+    /** 선체가 옆에서 받는 바람의 세기 (m/s)의 제곱에 곱해서, 바람이 선체를 기울이는 각도(rad)를 구하는 계수 */
+    windHeel: number;
+    /** 부서지는 마루가 선체의 옆면을 때릴 때의 기울기 계수 (rad). 마루의 가파름이 한계를 넘은 양에 곱한다. */
+    breakingHeel: number;
   };
   camera: {
     distance: number;
@@ -102,6 +110,11 @@ export const OCEAN_LINER: ShipSpec = {
     heelGain: 0.05,
     waveResponse: 1.2,
     rollRatio: 0.6,
+    // 대형 여객선은 느리고 크게 흔들린다.
+    roll: { period: 14, damping: 0.1, speedDamping: 0.004, vanishingAngle: 1.3 },
+    windHeel: 0.00008,
+    // 길이 180m의 선체에는 부서지는 마루가 의미 있는 힘을 주지 못한다.
+    breakingHeel: 0.2,
   },
   camera: {
     distance: 420,
@@ -155,6 +168,13 @@ export const SPORT_YACHT: ShipSpec = {
     heelGain: -0.02,
     waveResponse: 3.5,
     rollRatio: 0.8,
+    // 폭이 넓고 가벼운 활주형 선체는 3초 안팎의 짧은 주기로 흔들린다.
+    // 정지해 있을 때에는 흔들림이 오래 남고, 달리면 선저가 받는 양력 덕분에 빨리 잦아든다.
+    // 모터 요트는 용골이 없어서 약 65°를 넘으면 스스로 일어서지 못한다.
+    roll: { period: 3.2, damping: 0.12, speedDamping: 0.012, vanishingAngle: 1.13 },
+    // 옆바람 25 m/s에서 약 7° 기울어진다.
+    windHeel: 0.0002,
+    breakingHeel: 6,
   },
   camera: {
     distance: 45,

@@ -364,6 +364,17 @@ body {
   fill: var(--hud-text);
 }
 
+/* 경사계 */
+
+.hud-incline-zero {
+  stroke: var(--hud-text-muted);
+  stroke-width: 1.5;
+}
+
+.hud-value[data-danger='true'] {
+  color: var(--hud-port);
+}
+
 /* 겉보기 바람 */
 
 .hud-apparent {

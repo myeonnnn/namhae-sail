@@ -23,6 +23,8 @@ export interface HudFrame {
   controls: ShipControls;
   wind: Wind;
   engine: { rpm: number; maxRpm: number };
+  /** 횡경사 (rad). 우현 쪽으로 기울어지면 양수이다. */
+  heel: number;
   /** 바람이 육지에 막히지 않고 불어온 거리 (m) */
   fetch: number;
   /** 선체의 길이 (m). 레이더가 자선을 영상에서 제외하는 데 사용한다. */
@@ -131,10 +133,10 @@ export class Hud {
     this.minimap.resetTrack();
   }
 
-  update({ frameTime, camera, state, controls, wind, engine, fetch, shipLength, alert, focus }: HudFrame): void {
+  update({ frameTime, camera, state, controls, wind, engine, heel, fetch, shipLength, alert, focus }: HudFrame): void {
     this.minimap.update(state, focus);
     this.modeHint.hidden = !focus;
-    this.instruments.update(state, controls, wind, engine);
+    this.instruments.update(state, controls, wind, engine, heel);
     this.environment.update(fetch);
     this.radar.update(frameTime, state, shipLength);
     this.compass.update(camera, state, wind);

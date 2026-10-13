@@ -209,6 +209,46 @@ export function sampleWaveHeight(x: number, z: number, time: number): number {
   return height;
 }
 
+/** 한 지점을 지나고 있는 파도의 마루가 얼마나 가파른지를 나타낸다. */
+export interface Crest {
+  /**
+   * 마루의 가파름. 겹쳐진 파도들의 기울기를 마루의 위치에서 더한 값이며, 0.4 부근에서 실제의 파도가 부서지기 시작한다.
+   * 골에서는 음수이다.
+   */
+  steepness: number;
+  /** 가파름을 만든 파도들이 진행하는 방향 (월드의 x, z 성분). 길이는 1 이하이며, 여러 방향의 파도가 섞여 있을수록 짧다. */
+  dirX: number;
+  dirZ: number;
+}
+
+const crest: Crest = { steepness: 0, dirX: 0, dirZ: 0 };
+
+/**
+ * 월드의 (x, z) 지점에서 마루의 가파름을 읽는다. 선체가 부서지는 파도에 맞는지를 판정하는 데 사용한다.
+ * 매 프레임 호출하므로 같은 객체를 다시 사용해서 반환한다.
+ */
+export function sampleCrest(x: number, z: number, time: number): Crest {
+  let steepness = 0;
+  let dirX = 0;
+  let dirZ = 0;
+  let total = 0;
+  for (const wave of WAVES) {
+    const slope = wave.k * wave.amplitude;
+    const contribution = slope * Math.sin(phase(wave, x, z, time));
+    steepness += contribution;
+    // 마루를 지나고 있는 파도만 방향에 반영한다.
+    if (contribution > 0) {
+      dirX += wave.dirX * contribution;
+      dirZ += wave.dirZ * contribution;
+      total += contribution;
+    }
+  }
+  crest.steepness = steepness;
+  crest.dirX = total > 0 ? dirX / total : 0;
+  crest.dirZ = total > 0 ? dirZ / total : 0;
+  return crest;
+}
+
 function smoothstep(value: number, min: number, max: number): number {
   const t = Math.min(Math.max((value - min) / (max - min), 0), 1);
   return t * t * (3 - 2 * t);
