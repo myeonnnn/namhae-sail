@@ -14,7 +14,8 @@ const ref = (panel: HTMLElement, name: string) => panel.querySelector<HTMLElemen
 const INCLINE_PIVOT_X = 36;
 const INCLINE_PIVOT_Y = 8;
 const INCLINE_RADIUS = 40;
-const INCLINE_SCALE_DEG = 40;
+// 수면에 대한 기울기가 약 65°를 넘으면 뒤집히므로, 그 직전까지 추가 따라가도록 60°까지 그린다.
+const INCLINE_SCALE_DEG = 60;
 // 이 각도(도)부터는 위험한 기울기로 보고 붉은색으로 표시한다.
 const INCLINE_DANGER_DEG = 30;
 // 이보다 작은 기울기는 수평으로 표시한다. 잔잔한 물에서 값이 계속 바뀌어 보이지 않게 한다.

@@ -36,7 +36,7 @@ const ITEMS: GuideItem[] = [
   },
   {
     title: '경사계',
-    body: '선체의 좌우 기울기입니다. 추가 붉은 구간(30° 이상)에 들어가면 위험하고, 약 65°를 넘으면 스스로 일어서지 못하고 뒤집힙니다. 달리는 중에는 기울어지는 쪽의 반대로 타를 쓰면 선체가 일어섭니다. 속력이 빠를수록 잘 듣고, 멈춰 있으면 듣지 않습니다.',
+    body: '선체의 좌우 기울기입니다. 추가 붉은 구간(30° 이상)에 들어가면 위험하고, 50°를 넘기면 언제든 뒤집힐 수 있습니다. 달리는 중에는 기울어지는 쪽의 반대로 타를 쓰면 선체가 일어섭니다. 속력이 빠를수록 잘 듣고, 멈춰 있으면 듣지 않습니다.',
     figure: () => dial(Inclinometer.MARKUP, (container) => new Inclinometer(container).update((34 * Math.PI) / 180)),
   },
   {
@@ -62,7 +62,7 @@ const ITEMS: GuideItem[] = [
 
 /**
  * 계기판을 읽는 법과 거친 바다에서 조종하는 요령을 한 장에 모은 안내 화면.
- * 시작 화면과 설정 메뉴에서 열고, 닫기 버튼이나 Esc, 바깥을 눌러서 닫는다.
+ * 시작 화면과 도움말 메뉴에서 열고, 닫기 버튼이나 Esc, 바깥을 눌러서 닫는다.
  */
 export class Guide {
   private readonly overlay = document.createElement('div');
