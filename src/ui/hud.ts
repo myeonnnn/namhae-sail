@@ -14,6 +14,8 @@ import { SettingsMenu } from './settingsMenu';
 
 // 충돌이 해소된 뒤에도 경고를 잠시 유지해서, 깜빡이지 않고 읽을 수 있게 한다.
 const ALERT_HOLD_MS = 1500;
+// 조종 요령의 조언을 표시하는 시간 (ms). 달리면서 읽을 수 있을 만큼 길게 둔다.
+const TIP_HOLD_MS = 7000;
 const CONSOLE_MARGIN = 16;
 // 조작대의 높이는 화면 높이의 이 비율을 넘지 않는다.
 const MAX_CONSOLE_HEIGHT_RATIO = 0.3;
@@ -48,6 +50,8 @@ export class Hud {
   private readonly compass = new Compass();
   private readonly radar: Radar;
   private readonly alert = document.createElement('div');
+  private readonly tip = document.createElement('div');
+  private tipUntil = 0;
   private readonly bottom = document.createElement('div');
   private readonly modeHint = document.createElement('div');
   private readonly settings: SettingsMenu;
@@ -90,6 +94,8 @@ export class Hud {
 
     this.alert.className = 'hud-alert';
     this.alert.hidden = true;
+    this.tip.className = 'hud-tip';
+    this.tip.hidden = true;
 
     this.modeHint.className = 'hud-mode-hint';
     // 관찰 모드는 개발 서버에서만 켜지므로, 안내의 문구도 배포용 빌드에는 넣지 않는다.
@@ -104,7 +110,7 @@ export class Hud {
     credits.className = 'hud-credits';
     credits.textContent = '지형 표고: Mapzen Terrain Tiles, NASA SRTM · 지도 자료 © OpenStreetMap contributors';
 
-    root.append(bottom, right, this.modeHint, this.alert, credits);
+    root.append(bottom, right, this.modeHint, this.alert, this.tip, credits);
 
     window.addEventListener('resize', () => this.fitConsole());
     this.fitConsole();
@@ -135,6 +141,14 @@ export class Hud {
     this.settings.close();
   }
 
+  /** 조종 요령의 조언을 조작대의 바로 위에 한 줄로 잠시 표시한다. */
+  showTip(text: string): void {
+    this.tip.textContent = text;
+    this.tip.style.bottom = `${Math.round(this.consoleHeight + 10)}px`;
+    this.tip.hidden = false;
+    this.tipUntil = performance.now() + TIP_HOLD_MS;
+  }
+
   /** 타임어택의 코스를 지도에 표시한다. 코스를 지정하지 않으면 지운다. 도전하는 동안에는 파도의 세기를 바꿀 수 없게 한다. */
   setCourse(course?: Course): void {
     this.minimap.setCourse(course);
@@ -158,6 +172,7 @@ export class Hud {
     this.environment.update(fetch);
     this.radar.update(frameTime, state, shipLength);
     this.compass.update(camera, state);
+    if (!this.tip.hidden && performance.now() > this.tipUntil) this.tip.hidden = true;
     this.alert.hidden = performance.now() - alert.at > ALERT_HOLD_MS;
     if (!this.alert.hidden && this.alert.textContent !== alert.message) this.alert.textContent = alert.message;
   }

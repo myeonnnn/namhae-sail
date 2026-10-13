@@ -25,8 +25,11 @@ export class StartScreen {
   private readonly raceButton = document.createElement('button');
   private ready = false;
 
-  /** @param actions.timeAttack 타임어택 버튼을 눌렀을 때 호출한다. 시작 화면을 닫은 다음에 호출된다. */
-  constructor(root: HTMLElement, actions: { timeAttack?: () => void } = {}) {
+  /**
+   * @param actions.timeAttack 타임어택 버튼을 눌렀을 때 호출한다. 시작 화면을 닫은 다음에 호출된다.
+   * @param actions.guide 가이드를 여는 버튼을 눌렀을 때 호출한다. 시작 화면은 닫지 않는다.
+   */
+  constructor(root: HTMLElement, actions: { timeAttack?: () => void; guide?: () => void } = {}) {
     const { overlay, status, button, raceButton } = this;
     overlay.className = 'start-screen';
 
@@ -89,11 +92,20 @@ export class StartScreen {
 
     card.append(guide, sourcesTitle, sources, status, button);
     if (actions.timeAttack) card.append(raceButton);
+    if (actions.guide) {
+      const guideButton = document.createElement('button');
+      guideButton.type = 'button';
+      guideButton.className = 'start-link';
+      guideButton.textContent = '계기판을 읽는 법과 거친 바다의 요령 보기';
+      guideButton.addEventListener('click', () => actions.guide?.());
+      card.append(guideButton);
+    }
     overlay.append(card);
     root.append(overlay);
 
     // 준비가 끝난 뒤에는 조종에 쓰는 키를 눌러도 바로 시작한다.
     window.addEventListener('keydown', (event) => {
+      if (document.querySelector('.guide-overlay:not([hidden])')) return;
       if (this.ready && ['Enter', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code)) this.dismiss();
     });
   }

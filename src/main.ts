@@ -16,7 +16,9 @@ import { ImpactSpray } from './ship/impactSpray';
 import { Ship } from './ship/ship';
 import { SPORT_YACHT } from './ship/shipSpec';
 import { createCourseList } from './ui/courseList';
+import { createButton } from './ui/dom';
 import { createDevTools } from './ui/devTools';
+import { Guide } from './ui/guide';
 import { Hud } from './ui/hud';
 import { RaceHud } from './ui/raceHud';
 import { SeamarkInspector } from './ui/seamarkInspector';
@@ -26,6 +28,7 @@ import { readStartOptions } from './dev/startOptions';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
 import { isOutsideRegion, REGION } from './geo/region';
 import { TimeAttack } from './game/timeAttack';
+import { Coach } from './sim/coach';
 import { resolveCollisions } from './sim/collisions';
 import { SeaEffects } from './sim/seaEffects';
 import { loadChart } from './world/chartData';
@@ -171,6 +174,20 @@ function placeShip(x: number, z: number, heading: number): void {
   chaseCamera.resetView();
 }
 
+// ---- 가이드와 조언 ----
+const guide = new Guide(document.body);
+const coach = new Coach();
+hud.addSettingsSection(
+  '항해 가이드',
+  createButton({
+    content: '계기판을 읽는 법과 거친 바다의 요령',
+    onClick: () => {
+      hud.closeSettings();
+      guide.open();
+    },
+  }),
+);
+
 // ---- 타임어택 ----
 const timeAttack = new TimeAttack({
   ship,
@@ -234,7 +251,10 @@ const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement
 if (DEV_TOOLS) Object.assign(window, { __namhae: { stage, renderer, scene, camera, ship, ocean } });
 
 // ---- 시작 화면 ----
-const startScreen = new StartScreen(document.body, { timeAttack: () => timeAttack.start(COURSES[0]) });
+const startScreen = new StartScreen(document.body, {
+  timeAttack: () => timeAttack.start(COURSES[0]),
+  guide: () => guide.open(),
+});
 if (startOptions.skipIntro) startScreen.dismiss();
 // 선박의 모델과 지도의 자료를 받은 다음에, 주변의 지형이 모두 그려질 때까지 기다린다.
 // 자료를 받지 못해도 시작은 할 수 있어야 하므로 실패는 무시하고, 15초가 지나면 기다리지 않는다.
@@ -319,6 +339,19 @@ startLoop({
       focus: observer.active ? observer : undefined,
     });
     timeAttack.render();
+    // 배를 조종하고 있을 때에만 요령을 알려 준다.
+    if (startScreen.dismissed && !observer.active && !timeAttack.frozen) {
+      const offBow = Math.abs(((((wind.fromDeg - (ship.state.heading * 180) / Math.PI) % 360) + 540) % 360) - 180);
+      const tip = coach.update(frameTime, {
+        heel: ship.heel,
+        seaOffBow: offBow,
+        windSpeed: wind.speed,
+        speed: Math.hypot(ship.state.surge, ship.state.sway),
+        breaking: ship.breaking,
+        capsized: ship.capsized,
+      });
+      if (tip) hud.showTip(tip);
+    }
     seamarkInspector.update(camera, ship.state);
     renderer.render(scene, camera);
   },
