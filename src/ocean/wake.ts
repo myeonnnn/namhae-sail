@@ -84,7 +84,7 @@ export class Wake {
     this.texture = this.target.texture;
     this.halfExtent = Math.max(250, hull.length * 9);
     this.pointSpacing = Math.max(1.5, hull.length * 0.045);
-    this.wakeLife = 45 * Math.sqrt(hull.length / REFERENCE_LENGTH);
+    this.wakeLife = 20 * Math.sqrt(hull.length / REFERENCE_LENGTH);
 
     const indices: number[] = [];
     for (let ribbon = 0; ribbon < RIBBON_COUNT; ribbon++) {
