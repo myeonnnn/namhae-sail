@@ -160,7 +160,8 @@ export const SPORT_YACHT: ShipSpec = {
   },
   engine: { idleRpm: 650, maxRpm: 3200, response: 1.6 },
   controls: {
-    throttleRate: 0.8,
+    // 중립에서 전속까지 약 0.6초가 걸린다. 큰 파도 앞에서 속력을 바로 줄이거나 올릴 수 있어야 한다.
+    throttleRate: 1.6,
     rudderRate: 1.8,
   },
   motion: {
