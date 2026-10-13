@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { latLonToWorld } from '../geo/projection';
-import { sampleWaveHeight } from '../ocean/waves';
+import { sampleBaseHeight } from '../ocean/waves';
 import { loadSeamarkRecords, type SeamarkKind, type SeamarkRecord } from './seamarkData';
 import { SpatialGrid } from './spatialGrid';
 
@@ -175,7 +175,7 @@ export class Seamarks {
       if (mark.kind === 'buoy') {
         const distance = Math.hypot(mark.x - focusX, mark.z - focusZ);
         const bob = 1 - THREE.MathUtils.smoothstep(distance, BOB_FULL_DISTANCE, BOB_FADE_DISTANCE);
-        baseY = bob > 0 ? sampleWaveHeight(mark.x, mark.z, elapsed) * bob : 0;
+        baseY = bob > 0 ? sampleBaseHeight(mark.x, mark.z, elapsed) * bob : 0;
       } else {
         // 지형이 아직 불러와지지 않았거나 바다로 판정된 곳이면 수면 높이에 세운다. 방파제 끝의 등대가 여기에 해당한다.
         baseY = Math.max(this.groundHeight(mark.x, mark.z) ?? 0, 0);

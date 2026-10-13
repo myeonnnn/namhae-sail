@@ -3,7 +3,8 @@ import * as THREE from 'three';
 const SEGMENTS = 400;
 const HALF_EXTENT = 15000;
 // 격자의 중심부에서 선형으로 늘어나는 비율. 값이 작을수록 중심부의 정점이 촘촘해진다.
-const LINEAR_RATIO = 1 / 30;
+// 중심부의 간격이 1m가 되는 값이다. 푸리에 변환으로 만든 잔물결(파장 수 m)을 배 주변에서 형태로 표현하려면 이 정도로 촘촘해야 한다.
+const LINEAR_RATIO = 1 / 75;
 
 /** 격자의 중심부에서 정점 사이의 간격 (m). 격자를 이 간격의 배수로만 이동시키면 수면이 일렁이지 않는다. */
 export const OCEAN_CELL_SIZE = (HALF_EXTENT * LINEAR_RATIO) / (SEGMENTS / 2);

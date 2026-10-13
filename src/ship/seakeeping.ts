@@ -1,4 +1,4 @@
-import { BREAKING_STEEPNESS, sampleCrest, sampleWaveHeight } from '../ocean/waves';
+import { BREAKING_STEEPNESS, findBasePosition, sampleBaseHeight, sampleCrest } from '../ocean/waves';
 import { apparentWind, type ShipState } from './shipPhysics';
 import type { ShipSpec } from './shipSpec';
 
@@ -47,6 +47,12 @@ export function measureSeaLoad(
   const sin = Math.sin(state.heading);
   const cos = Math.cos(state.heading);
 
+  // 수면의 점은 마루 쪽으로 수평 이동한다. 선체의 길이 안에서는 이동량이 거의 같으므로,
+  // 선체의 중심에서 한 번만 구해서 모든 측정 위치에 함께 적용한다.
+  const base = findBasePosition(state.x, state.z, time);
+  const shiftX = base.x - state.x;
+  const shiftZ = base.z - state.z;
+
   let heightSum = 0;
   let alongMoment = 0;
   let alongSquare = 0;
@@ -56,9 +62,9 @@ export function measureSeaLoad(
     for (const across of HULL_SAMPLES_ACROSS) {
       const forward = along * length;
       const starboard = across * beam;
-      const height = sampleWaveHeight(
-        state.x + forward * sin + starboard * cos,
-        state.z - forward * cos + starboard * sin,
+      const height = sampleBaseHeight(
+        state.x + shiftX + forward * sin + starboard * cos,
+        state.z + shiftZ - forward * cos + starboard * sin,
         time,
       );
       heightSum += height;
@@ -81,7 +87,7 @@ export function measureSeaLoad(
 
   // 부서지는 마루는 선체의 옆면을 때려서, 파도가 진행하는 쪽으로 선체를 넘어뜨린다.
   // 선수나 선미로 받으면 옆으로 미는 성분이 없어서, 천천히 갈 때에는 거의 기울지 않는다.
-  const crest = sampleCrest(state.x, state.z, time);
+  const crest = sampleCrest(state.x + shiftX, state.z + shiftZ, time);
   const speed = Math.hypot(state.surge, state.sway);
   const impact = Math.max(crest.steepness - BREAKING_STEEPNESS, 0) * (1 + speed / IMPACT_SPEED_SCALE);
   const towardStarboard = crest.dirX * cos + crest.dirZ * sin;

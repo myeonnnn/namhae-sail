@@ -33,6 +33,16 @@ export function createBands(frequencies: readonly number[]): Band[] {
 }
 
 /**
+ * 풍속과 취주 거리에 대응하는, 에너지가 가장 큰 각진동수 (rad/s).
+ * 취주 거리가 짧으면 파도가 덜 자라서 진동수가 높고(파장이 짧고), 충분히 길면 다 자란 바다의 값에서 멈춘다.
+ */
+export function peakFrequency(windSpeed: number, fetch: number): number {
+  const scale = GRAVITY / windSpeed;
+  const dimensionlessFetch = (GRAVITY * fetch) / windSpeed ** 2;
+  return Math.max(22 * scale * dimensionlessFetch ** -0.33, DEVELOPED_PEAK * scale);
+}
+
+/**
  * 풍속과 취주 거리에 대응하는 각 구간의 진폭(m)을 JONSWAP 스펙트럼으로 구해서 out에 적는다.
  *
  * 바람이 수면 위를 불어온 거리(취주 거리)가 짧으면 파도가 덜 자라서, 낮고 파장이 짧다.
@@ -51,7 +61,7 @@ export function jonswapAmplitudes(windSpeed: number, fetch: number, bands: reado
   const scale = GRAVITY / windSpeed;
   const dimensionlessFetch = (GRAVITY * fetch) / windSpeed ** 2;
   const developedPeak = DEVELOPED_PEAK * scale;
-  const peak = Math.max(22 * scale * dimensionlessFetch ** -0.33, developedPeak);
+  const peak = peakFrequency(windSpeed, fetch);
   const alpha = Math.max(0.076 * dimensionlessFetch ** -0.22, DEVELOPED_ALPHA);
   // 다 자란 바다에 가까워질수록 봉우리가 완만해진다.
   const youth = Math.min(Math.max((peak / developedPeak - 1) / 0.3, 0), 1);

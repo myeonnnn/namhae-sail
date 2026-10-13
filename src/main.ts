@@ -8,7 +8,7 @@ import { LocalRecordStore } from './course/records';
 import { createTimeOfDay, sunPosition } from './environment/sun';
 import { createWeather, updateWeather } from './environment/weather';
 import { windVelocity } from './environment/wind';
-import { Ocean } from './ocean/ocean';
+import { Ocean, SHALLOW_RANGE } from './ocean/ocean';
 import { Wake } from './ocean/wake';
 import { currentWaveHeight, updateWaves } from './ocean/waves';
 import { ChaseCamera } from './ship/chaseCamera';
@@ -61,7 +61,8 @@ const input = new Input();
 const weather = createWeather();
 const { wind, swell } = weather;
 // 파도가 자라는 조건 가운데 위치에 따라 달라지는 값. 섬에 가려진 곳에서는 파도가 낮아진다.
-const exposure = new SeaExposure();
+// 육지의 격자가 준비되면, 해안에 가까운 수면을 얕은 물의 색으로 칠할 수 있도록 수면에 전달한다.
+const exposure = new SeaExposure((shelter) => ocean.setShore(shelter.shoreMap(SHALLOW_RANGE)));
 const timeOfDay = createTimeOfDay();
 const wake = new Wake(renderer, SHIP.model);
 const ocean = new Ocean(scene, renderer, wake);
@@ -332,7 +333,7 @@ startLoop({
     wake.update(seaTime, ship.state);
     // 맵의 범위 안에서는 위치에 따른 태양의 차이가 1° 미만이므로, 고정된 기준 지점으로 계산한다.
     ocean.setSun(sunPosition(timeOfDay, WORLD_ORIGIN));
-    ocean.update(seaTime, focus.x, focus.z, camera, canvas.clientHeight, wind);
+    ocean.update(seaTime, focus.x, focus.z, camera, wind);
     impactSpray.update(frameTime);
     hud.update({
       frameTime,

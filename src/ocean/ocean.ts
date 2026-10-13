@@ -1,15 +1,20 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { SeaSurface, type SeaCascade } from './seaSurface';
 import { createOceanGeometry, OCEAN_CELL_SIZE } from './oceanGeometry';
 import { createOceanMaterial } from './oceanMaterial';
 import type { Wake } from './wake';
-import { WAVES } from './waves';
 import { sunlight, type SunPosition } from '../environment/sun';
 import type { Wind } from '../environment/wind';
+import type { ShoreMap } from '../world/shelter';
 import { createWaterNormals } from './waterNormals';
 
 // 강풍에 날리는 물보라가 보이기 시작하는 풍속과 가장 짙어지는 풍속 (m/s)
 const SPINDRIFT_WIND = [13, 30] as const;
+// 해안에서 이 거리(m) 이내의 수면을 얕은 물의 색으로 칠한다. 해안에 가까울수록 색이 짙어진다.
+export const SHALLOW_RANGE = 700;
+// 잔물결이 정점을 실제로 옮기는 범위 (m). 이 바깥은 정점이 성겨서 잔물결의 형태를 담지 못한다.
+const DETAIL_DISPLACE_RANGE = 140;
 const SKY_CUBE_SIZE = 256;
 // 이 거리에서 물체의 색상이 약 63%만큼 수평선의 색상으로 바뀐다.
 const HAZE_DISTANCE = 9000;
@@ -43,6 +48,7 @@ export class Ocean {
   });
   private readonly cubeCamera = new THREE.CubeCamera(1, 20000, this.skyCube);
   private readonly pmrem: THREE.PMREMGenerator;
+  private readonly sea: SeaSurface;
   private environmentTarget?: THREE.WebGLRenderTarget;
   private appliedSunKey = '';
   private lastBakeTime = -Infinity;
@@ -54,6 +60,7 @@ export class Ocean {
     wake: Wake,
   ) {
     this.pmrem = new THREE.PMREMGenerator(renderer);
+    this.sea = new SeaSurface(renderer);
 
     this.sky.scale.setScalar(10000);
     const skyUniforms = this.sky.material.uniforms;
@@ -81,6 +88,8 @@ export class Ocean {
         sunDirection: this.sunDirection,
         wake,
         hazeDistance: HAZE_DISTANCE,
+        cascades: this.sea.cascades as [SeaCascade, SeaCascade, SeaCascade],
+        detailDisplaceRange: DETAIL_DISPLACE_RANGE,
       }),
     );
     // 정점을 셰이더에서 이동시키므로 Three.js가 계산한 경계 상자로는 화면 밖 여부를 판정할 수 없다.
@@ -124,6 +133,9 @@ export class Ocean {
     (this.surface.material.uniforms['uSunColor'].value as THREE.Color)
       .setRGB(color[0], color[1], color[2])
       .multiplyScalar(SUN_INTENSITY * strength * GLINT_SCALE);
+    (this.surface.material.uniforms['uSunLight'].value as THREE.Color)
+      .setRGB(color[0], color[1], color[2])
+      .multiplyScalar(SUN_INTENSITY * strength);
 
     // 낮에는 푸른 회색, 해가 낮을 때에는 따뜻한 색, 해가 진 뒤에는 어두운 색으로 연무의 색상을 바꾼다.
     this.fog.color
@@ -132,6 +144,25 @@ export class Ocean {
       .lerp(HAZE_NIGHT, 1 - THREE.MathUtils.smoothstep(position.elevationDeg, -6, 4));
 
     this.bakePending = true;
+  }
+
+  /** 해안이 얼마나 가까운지를 기록한 지도를 받아서, 수면의 셰이더가 읽을 텍스처로 만든다. */
+  setShore(shore: ShoreMap): void {
+    const texture = new THREE.DataTexture(shore.data, shore.columns, shore.rows, THREE.RedFormat);
+    // 한 칸이 100m여서 그대로 읽으면 계단이 보이므로, 이웃한 칸의 값을 섞어서 읽는다.
+    texture.magFilter = texture.minFilter = THREE.LinearFilter;
+    // 한 칸이 1바이트이므로, 한 줄의 길이가 4의 배수가 아니어도 줄이 밀리지 않게 한다.
+    texture.unpackAlignment = 1;
+    texture.needsUpdate = true;
+    const { uniforms } = this.surface.material;
+    (uniforms['uShoreMap'].value as THREE.Texture).dispose();
+    uniforms['uShoreMap'].value = texture;
+    (uniforms['uShoreBounds'].value as THREE.Vector4).set(
+      shore.minX,
+      shore.minZ,
+      shore.columns * shore.cellSize,
+      shore.rows * shore.cellSize,
+    );
   }
 
   /**
@@ -152,14 +183,7 @@ export class Ocean {
   }
 
   /** elapsed는 부력 계산과 동일한 시계여야 화면의 파도와 배의 움직임이 일치한다. */
-  update(
-    elapsed: number,
-    focusX: number,
-    focusZ: number,
-    camera: THREE.PerspectiveCamera,
-    viewportHeight: number,
-    wind: Wind,
-  ): void {
+  update(elapsed: number, focusX: number, focusZ: number, camera: THREE.PerspectiveCamera, wind: Wind): void {
     const now = performance.now();
     if (this.bakePending && now - this.lastBakeTime >= SKY_REBAKE_INTERVAL_MS) {
       this.bakePending = false;
@@ -171,12 +195,10 @@ export class Ocean {
     this.sunLight.target.position.set(focusX, 0, focusZ);
     this.sunLight.position.copy(this.sunDirection).multiplyScalar(SHADOW_DISTANCE).add(this.sunLight.target.position);
 
+    // 수면의 형태를 지금 시각의 것으로 다시 만든다.
+    this.sea.update(elapsed);
+
     const { uniforms } = this.surface.material;
-    // 바람에 따라 갱신된 파도의 목록을 셰이더에 전달한다.
-    WAVES.forEach((wave, i) => {
-      (uniforms['uWaveShape'].value as THREE.Vector4[])[i].set(wave.dirX, wave.dirZ, wave.k, wave.amplitude);
-      (uniforms['uWaveMotion'].value as THREE.Vector4[])[i].set(wave.omega, wave.q, wave.wavelength, 0);
-    });
     // 바람이 없으면 잔물결이 사라져서 수면이 거울처럼 매끄러워진다.
     uniforms['uRippleStrength'].value = 0.15 + 0.85 * THREE.MathUtils.smoothstep(wind.speed, 0, 9);
     // 풍향은 불어오는 쪽이므로, 물보라는 그 반대쪽으로 날린다. 초속 13m 부근부터 보이기 시작한다.
@@ -184,7 +206,6 @@ export class Ocean {
     (uniforms['uWindDirection'].value as THREE.Vector2).set(Math.sin(toward), -Math.cos(toward));
     uniforms['uSpindrift'].value = THREE.MathUtils.smoothstep(wind.speed, SPINDRIFT_WIND[0], SPINDRIFT_WIND[1]);
     uniforms['uTime'].value = elapsed;
-    uniforms['uPixelAngle'].value = THREE.MathUtils.degToRad(camera.fov) / viewportHeight;
     // 파도는 월드 좌표를 기준으로 계산되므로 격자를 옮겨도 파도가 따라 움직이지 않는다.
     // 다만 격자를 연속적으로 옮기면 정점이 파도를 읽는 위치가 매 프레임 달라져서 수면이 일렁이므로, 칸 단위로만 옮긴다.
     this.surface.position.set(
