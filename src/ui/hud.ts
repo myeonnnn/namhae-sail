@@ -9,7 +9,9 @@ import { EnvironmentPanel } from './environmentPanel';
 import { Instruments } from './instruments';
 import { Minimap } from './minimap';
 import { Radar, type RadarProbe } from './radar';
+import { createButton } from './dom';
 import { DropdownMenu } from './dropdownMenu';
+import { isMuted, setMuted } from './sound';
 
 // 충돌이 해소된 뒤에도 경고를 잠시 유지해서, 깜빡이지 않고 읽을 수 있게 한다.
 const ALERT_HOLD_MS = 1500;
@@ -43,6 +45,7 @@ export type MenuId = 'race' | 'start' | 'help' | 'dev';
 const MENU_LABELS: Record<MenuId, string> = { race: '타임어택', start: '시작 위치', help: '도움말', dev: '개발 도구' };
 // 왼쪽부터 놓는 순서
 const MENU_ORDER: MenuId[] = ['race', 'start', 'help', 'dev'];
+const SOUND_LABELS = { on: '소리 켜짐', off: '소리 꺼짐' };
 
 /**
  * 화면 위의 표시 장치를 배치한다.
@@ -89,6 +92,18 @@ export class Hud {
     // 왼쪽 위의 메뉴는 역할별로 나눈다. 개발 도구의 메뉴는 구역이 추가될 때에만 만들어지므로, 배포한 화면에는 나타나지 않는다.
     this.menuBar.className = 'hud-menus';
     root.append(this.menuBar);
+    // 소리를 켜고 끄는 버튼. 메뉴들이 나중에 추가되어도 항상 맨 오른쪽에 놓이도록 순서를 지정해 둔다.
+    const soundButton = createButton({
+      content: isMuted() ? SOUND_LABELS.off : SOUND_LABELS.on,
+      className: 'hud-menu-button hud-sound-button',
+      onClick: () => {
+        setMuted(!isMuted());
+        soundButton.textContent = isMuted() ? SOUND_LABELS.off : SOUND_LABELS.on;
+        soundButton.setAttribute('aria-pressed', String(!isMuted()));
+      },
+    });
+    soundButton.setAttribute('aria-pressed', String(!isMuted()));
+    this.menuBar.append(soundButton);
 
     const right = document.createElement('div');
     right.className = 'hud-column hud-column-right';

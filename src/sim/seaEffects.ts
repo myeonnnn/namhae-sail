@@ -24,6 +24,8 @@ export class SeaEffects {
     private readonly spray: ImpactSpray,
     private readonly camera: ChaseCamera,
     private readonly showAlert: (message: string) => void,
+    /** 물이 선체를 때리는 소리를 낸다. intensity는 0~1 범위의 세기이다. */
+    private readonly playSplash: (intensity: number) => void = () => {},
   ) {}
 
   /** 선체의 자세를 갱신한 다음에 매 프레임 호출한다. */
@@ -35,6 +37,7 @@ export class SeaEffects {
         this.wasCapsized = true;
         this.spray.burst(x, 0.5, z, 1, hull.length * 0.6);
         this.camera.shake(1);
+        this.playSplash(1);
         this.onCapsize?.();
       }
       // 경고는 일정 시간이 지나면 사라지므로, 뒤집혀 있는 동안에는 계속 다시 표시한다.
@@ -49,6 +52,7 @@ export class SeaEffects {
       const intensity = Math.min(ship.breaking / (BREAKER_THRESHOLD * 4), 1);
       this.spray.burst(x, 0.5, z, intensity, hull.beam);
       this.camera.shake(intensity * 0.5);
+      this.playSplash(intensity * 0.7);
     }
   }
 

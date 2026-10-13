@@ -10,11 +10,13 @@ import { createWeather, updateWeather } from './environment/weather';
 import { windVelocity } from './environment/wind';
 import { Ocean } from './ocean/ocean';
 import { Wake } from './ocean/wake';
-import { updateWaves } from './ocean/waves';
+import { currentWaveHeight, updateWaves } from './ocean/waves';
 import { ChaseCamera } from './ship/chaseCamera';
 import { ImpactSpray } from './ship/impactSpray';
 import { Ship } from './ship/ship';
 import { SPORT_YACHT } from './ship/shipSpec';
+import { AmbientSound } from './ui/ambientSound';
+import { playSplash } from './ui/sound';
 import { createCourseList } from './ui/courseList';
 import { createButton } from './ui/dom';
 import { createDevTools } from './ui/devTools';
@@ -126,7 +128,7 @@ function playImpact(speed: number, movingAhead: boolean, strength: number): void
 
 // 배가 뒤집혔을 때 되돌아갈 위치. 마지막으로 배를 놓은 곳이다.
 const restart = { x: ship.state.x, z: ship.state.z, heading: ship.state.heading };
-const seaEffects = new SeaEffects(ship, SHIP.model, impactSpray, chaseCamera, showAlert);
+const seaEffects = new SeaEffects(ship, SHIP.model, impactSpray, chaseCamera, showAlert, playSplash);
 
 function degToRad(degrees: number): number {
   return (degrees * Math.PI) / 180;
@@ -174,6 +176,9 @@ function placeShip(x: number, z: number, heading: number): void {
   chaseCamera.alignTo(heading);
   chaseCamera.resetView();
 }
+
+// 엔진과 파도, 바람의 소리
+const ambientSound = new AmbientSound();
 
 // ---- 가이드와 조언 ----
 const guide = new Guide(document.body);
@@ -252,7 +257,7 @@ if (startOptions.observe) {
 const seamarkInspector = new SeamarkInspector(document.querySelector<HTMLElement>('#hud')!, canvas, seamarks);
 
 // (개발 서버에서만) 브라우저의 콘솔과 성능 측정 스크립트에서 장면을 조사할 수 있도록 주요 객체를 꺼내 둔다.
-if (DEV_TOOLS) Object.assign(window, { __namhae: { stage, renderer, scene, camera, ship, ocean } });
+if (DEV_TOOLS) Object.assign(window, { __namhae: { stage, renderer, scene, camera, ship, ocean, ambientSound } });
 
 // ---- 시작 화면 ----
 const startScreen = new StartScreen(document.body, {
@@ -343,6 +348,12 @@ startLoop({
       focus: observer.active ? observer : undefined,
     });
     timeAttack.render();
+    // 시작 화면에서는 엔진이 꺼진 것처럼 파도와 바람의 소리만 낸다.
+    ambientSound.update({
+      rpmRatio: startScreen.dismissed ? ship.rpm / SHIP.engine.maxRpm : 0,
+      waveHeight: currentWaveHeight(),
+      windSpeed: wind.speed,
+    });
     // 배를 조종하고 있을 때에만 요령을 알려 준다.
     if (startScreen.dismissed && !observer.active && !timeAttack.frozen) {
       const offBow = Math.abs(((((wind.fromDeg - (ship.state.heading * 180) / Math.PI) % 360) + 540) % 360) - 180);

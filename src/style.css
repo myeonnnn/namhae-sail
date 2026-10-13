@@ -472,6 +472,11 @@ body {
   position: relative;
 }
 
+/* 소리 버튼은 메뉴들의 오른쪽 끝에 둔다. */
+.hud-sound-button {
+  order: 10;
+}
+
 #hud .hud-menu-button {
   height: 32px;
   padding: 0 12px;
@@ -486,6 +491,10 @@ body {
   background: var(--hud-ahead);
   border-color: var(--hud-ahead);
   color: #0b1a2a;
+}
+
+#hud .hud-sound-button[aria-pressed='false'] {
+  color: var(--hud-text-muted);
 }
 
 /* 제목 없이 내용만 있는 메뉴 */
