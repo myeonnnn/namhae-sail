@@ -3,7 +3,9 @@ import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
 import { createStage } from './core/renderer';
+import { createSeaState, updateSeaState } from './environment/seaState';
 import { createTimeOfDay, sunPosition } from './environment/sun';
+import { createSwell } from './environment/swell';
 import { createWind, windVelocity } from './environment/wind';
 import { Ocean } from './ocean/ocean';
 import { Wake } from './ocean/wake';
@@ -24,6 +26,7 @@ import { resolveCollisions } from './sim/collisions';
 import { loadChart } from './world/chartData';
 import { loadSeamarkRecords } from './world/seamarkData';
 import { Seamarks } from './world/seamarks';
+import { OPEN_SEA_FETCH, Shelter } from './world/shelter';
 import { Bridges } from './world/bridges';
 import { Structures } from './world/structures';
 import { Terrain } from './world/terrain';
@@ -44,6 +47,8 @@ const { renderer, scene, camera } = stage;
 
 const input = new Input();
 const wind = createWind();
+const swell = createSwell();
+const sea = createSeaState(wind, swell);
 const timeOfDay = createTimeOfDay();
 const wake = new Wake(renderer, SHIP.model);
 const ocean = new Ocean(scene, renderer, wake);
@@ -63,7 +68,7 @@ const seamarks = new Seamarks(scene, (x, z) => structures.topNear(x, z, 8) ?? te
 
 const chaseCamera = new ChaseCamera(camera, canvas, SHIP.camera);
 chaseCamera.alignTo(ship.state.heading);
-const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, wind, timeOfDay, {
+const hud = new Hud(document.querySelector<HTMLElement>('#hud')!, { wind, swell, sea }, timeOfDay, {
   // 레이더에 넓은 물체로 표시하는 것: 육지, 방파제와 부두, 그리고 선박이 지나갈 수 없을 만큼 낮은 다리.
   // 아래로 지나갈 수 있는 다리의 상판은 장애물이 아니므로 표시하지 않고, 실제로 부딪히는 교각만 점으로 표시한다.
   isSolid: (x, z) =>
@@ -86,6 +91,17 @@ function showAlert(message: string): void {
 const syncBottomInset = () => stage.setBottomInset(hud.consoleHeight);
 window.addEventListener('resize', syncBottomInset);
 syncBottomInset();
+
+// 파도가 자라는 조건 가운데 위치에 따라 달라지는 값. 섬에 가려진 곳에서는 파도가 낮아진다.
+// 육지의 격자를 받기 전에는 열린 바다로 가정한다.
+const exposure = { fetch: OPEN_SEA_FETCH, swellFetch: OPEN_SEA_FETCH };
+let shelter: Shelter | undefined;
+void Shelter.load()
+  .then((loaded) => (shelter = loaded))
+  .catch((error) => console.warn('육지의 격자를 만들지 못했습니다. 파도가 섬에 가려지지 않습니다.', error));
+// 수십 km를 따라가며 재는 계산이고 배는 그 사이에 얼마 움직이지 않으므로, 이 간격(초)으로만 다시 잰다.
+const EXPOSURE_INTERVAL = 0.5;
+let exposureAge = Infinity;
 
 const impactSpray = new ImpactSpray(scene);
 // 이 속력(m/s)보다 느린 접촉은 연출 없이 경고만 표시한다. 육지에 닿은 채로 밀고 있을 때 매 스텝 반복되는 것을 막는다.
@@ -221,7 +237,14 @@ startLoop({
     // 지형과 표지, 수면의 격자는 카메라가 보고 있는 곳을 중심으로 불러오고 배치한다.
     const focus = observer.active ? observer : ship.state;
 
-    updateWaves(wind, frameTime);
+    exposureAge += frameTime;
+    if (shelter && exposureAge >= EXPOSURE_INTERVAL) {
+      exposureAge = 0;
+      exposure.fetch = shelter.fetch(focus.x, focus.z, wind.fromDeg);
+      exposure.swellFetch = shelter.fetch(focus.x, focus.z, swell.fromDeg);
+    }
+    updateSeaState(sea, wind, swell, frameTime);
+    updateWaves(wind, swell, exposure, frameTime);
     ship.syncObject(elapsed, frameTime);
     chaseCamera.update(frameTime, focus);
     terrain.update(focus.x, focus.z);
@@ -238,6 +261,7 @@ startLoop({
       controls: ship.controls,
       wind,
       engine: { rpm: ship.rpm, maxRpm: SHIP.engine.maxRpm },
+      fetch: exposure.fetch,
       shipLength: SHIP.model.length,
       alert,
       focus: observer.active ? observer : undefined,

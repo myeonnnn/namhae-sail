@@ -3,7 +3,7 @@ import type { TimeOfDay } from '../environment/sun';
 import type { Wind } from '../environment/wind';
 import type { ShipControls, ShipState } from '../ship/shipPhysics';
 import { Compass } from './compass';
-import { EnvironmentPanel } from './environmentPanel';
+import { EnvironmentPanel, type Weather } from './environmentPanel';
 import { Instruments } from './instruments';
 import { createKeyGuide } from './keyGuide';
 import { Minimap } from './minimap';
@@ -23,6 +23,8 @@ export interface HudFrame {
   controls: ShipControls;
   wind: Wind;
   engine: { rpm: number; maxRpm: number };
+  /** 바람이 육지에 막히지 않고 불어온 거리 (m) */
+  fetch: number;
   /** 선체의 길이 (m). 레이더가 자선을 영상에서 제외하는 데 사용한다. */
   shipLength: number;
   /** 가장 최근의 충돌에 대한 경고 문구와 그 시각 (performance.now 기준). 충돌한 적이 없으면 시각이 -Infinity이다. */
@@ -45,8 +47,9 @@ export class Hud {
   private readonly bottom = document.createElement('div');
   private readonly modeHint = document.createElement('div');
   private readonly settings: SettingsMenu;
+  private readonly environment: EnvironmentPanel;
 
-  constructor(root: HTMLElement, wind: Wind, timeOfDay: TimeOfDay, radarProbe: RadarProbe) {
+  constructor(root: HTMLElement, weather: Weather, timeOfDay: TimeOfDay, radarProbe: RadarProbe) {
     const { bottom } = this;
     bottom.className = 'hud-bottom';
     this.minimap = new Minimap(bottom);
@@ -69,7 +72,7 @@ export class Hud {
 
     const right = document.createElement('div');
     right.className = 'hud-column hud-column-right';
-    new EnvironmentPanel(right, wind, timeOfDay);
+    this.environment = new EnvironmentPanel(right, weather, timeOfDay);
     // 나침반은 카메라의 방향을 알려 주는 표시이므로, 조종의 계기와 분리해서 화면의 구석에 둔다.
     const compassPanel = document.createElement('div');
     compassPanel.className = 'hud-panel hud-compass-panel';
@@ -128,10 +131,11 @@ export class Hud {
     this.minimap.resetTrack();
   }
 
-  update({ frameTime, camera, state, controls, wind, engine, shipLength, alert, focus }: HudFrame): void {
+  update({ frameTime, camera, state, controls, wind, engine, fetch, shipLength, alert, focus }: HudFrame): void {
     this.minimap.update(state, focus);
     this.modeHint.hidden = !focus;
     this.instruments.update(state, controls, wind, engine);
+    this.environment.update(fetch);
     this.radar.update(frameTime, state, shipLength);
     this.compass.update(camera, state, wind);
     this.alert.hidden = performance.now() - alert.at > ALERT_HOLD_MS;

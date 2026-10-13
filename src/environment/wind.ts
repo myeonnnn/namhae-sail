@@ -6,14 +6,19 @@ export interface Wind {
   fromDeg: number;
 }
 
-export const MAX_WIND_SPEED = 20;
+// 초속 35m는 강한 태풍에 해당한다. 실제로는 소형 선박이 나갈 수 없는 날씨이지만, 게임에서 가장 거친 바다의 기준으로 삼는다.
+export const MAX_WIND_SPEED = 35;
+
+// 풍향을 조절하는 막대의 간격 (도)
+export const WIND_DIRECTION_STEP = 5;
 
 /**
- * 기본값은 15m급 요트가 운항하기에 적당한 날씨이다.
- * 초속 6m는 흰 물거품이 드문드문 보이기 시작하는 바람이며, 유의파고는 약 0.5m이다.
+ * 풍향은 접속할 때마다 무작위로 정한다. 같은 항로도 바람에 따라 파도를 받는 방향과 섬에 가려지는 구간이 달라진다.
+ * 풍속은 파도의 세기를 고르면 정해진다 (seaState.ts).
  */
 export function createWind(): Wind {
-  return { speed: 6, fromDeg: 225 };
+  const steps = 360 / WIND_DIRECTION_STEP;
+  return { speed: 0, fromDeg: Math.floor(Math.random() * steps) * WIND_DIRECTION_STEP };
 }
 
 /** 바람이 공기를 이동시키는 속도를 월드 좌표로 반환한다. 풍향은 불어오는 쪽이므로 반대 방향을 향한다. */

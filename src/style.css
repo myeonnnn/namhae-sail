@@ -511,6 +511,38 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* 파도의 세기를 고르는 다섯 개의 버튼 */
+.hud-sea-levels {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hud-border);
+}
+
+.hud-sea-level-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.hud-sea-level-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+#hud .hud-sea-level-buttons button {
+  padding: 5px 0;
+  font: 600 12px/1 var(--hud-font-number);
+}
+
+#hud .hud-sea-level-buttons button[aria-pressed='true'] {
+  background: var(--hud-ahead);
+  border-color: var(--hud-ahead);
+  color: #06202f;
+}
+
 .hud-environment-controls {
   display: grid;
   gap: 6px;
@@ -521,7 +553,7 @@ body {
 
 .hud-environment-controls label {
   display: grid;
-  grid-template-columns: 2.5em 1fr;
+  grid-template-columns: 4.5em 1fr;
   align-items: center;
   gap: 8px;
 }
