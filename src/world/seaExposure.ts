@@ -14,9 +14,13 @@ export class SeaExposure implements Exposure {
   private shelter?: Shelter;
   private age = Infinity;
 
-  constructor() {
+  /** @param onShelter 육지의 격자가 준비되면 한 번 호출된다. */
+  constructor(onShelter?: (shelter: Shelter) => void) {
     void Shelter.load()
-      .then((shelter) => (this.shelter = shelter))
+      .then((shelter) => {
+        this.shelter = shelter;
+        onShelter?.(shelter);
+      })
       .catch((error) => console.warn('육지의 격자를 만들지 못했습니다. 파도가 섬에 가려지지 않습니다.', error));
   }
 

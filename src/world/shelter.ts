@@ -1,5 +1,6 @@
 import { latLonToWorld } from '../geo/projection';
 import { REGION } from '../geo/region';
+import { distanceToLand } from './shoreDistance';
 
 const LAND_URL = '/data/land.json';
 // 육지를 기록하는 격자의 한 칸 (m). 파도를 막는 섬을 구분하는 데에는 이 정도면 충분하다.
@@ -12,6 +13,18 @@ export const OPEN_SEA_FETCH = 80000;
 const MIN_FETCH = 200;
 // 바람은 한 줄로 불어오지 않으므로, 풍향의 좌우로 벌린 여러 방향을 함께 잰다 (도).
 const RAY_OFFSETS = [-30, -15, 0, 15, 30];
+
+/** 구역 전체에서 해안이 얼마나 가까운지를 기록한 지도. 수면의 셰이더가 얕은 물의 색을 정하는 데 사용한다. */
+export interface ShoreMap {
+  /** 칸마다의 값: 해안에 닿아 있으면 255, range만큼 떨어져 있으면 0 */
+  data: Uint8Array;
+  columns: number;
+  rows: number;
+  /** 지도의 북서쪽 모서리 (월드 좌표, m) */
+  minX: number;
+  minZ: number;
+  cellSize: number;
+}
 
 /**
  * 한 지점에서 바람이 불어오는 쪽으로 육지를 만날 때까지의 거리(취주 거리, m)를 잰다.
@@ -92,6 +105,19 @@ export class Shelter {
     const row = Math.floor((z - this.minZ) / CELL_SIZE);
     if (column < 0 || row < 0 || column >= this.columns || row >= this.rows) return false;
     return this.land[row * this.columns + column] === 1;
+  }
+
+  /**
+   * 해안에서 range(m) 이내의 수면을 가까울수록 큰 값으로 기록한 지도를 만든다.
+   * 수심 자료가 없으므로, 해안에 가까운 곳을 얕은 물로 간주하는 데 사용한다.
+   */
+  shoreMap(range: number): ShoreMap {
+    const distance = distanceToLand(this.land, this.columns, this.rows);
+    const data = new Uint8Array(distance.length);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = Math.round(255 * Math.max(1 - (distance[i] * CELL_SIZE) / range, 0));
+    }
+    return { data, columns: this.columns, rows: this.rows, minX: this.minX, minZ: this.minZ, cellSize: CELL_SIZE };
   }
 
   /** 한 지점에서 fromDeg 방향으로 열려 있는 수면의 거리 (m) */
