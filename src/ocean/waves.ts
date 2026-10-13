@@ -209,6 +209,13 @@ export function sampleWaveHeight(x: number, z: number, time: number): number {
   return height;
 }
 
+/**
+ * 마루의 가파름이 이 값을 넘으면 부서지는 것으로 본다. 선체를 넘어뜨리는 힘의 계산과, 수면에 흰 물거품을 그리는 셰이더가 함께 사용한다.
+ * 하나의 파도는 0.4 부근에서 부서지지만, 이 프로젝트의 수면은 파도 12개의 합이어서 실제 바다보다 완만하다.
+ * 파도 세기 3단계에서는 기울기만 하고, 4단계에서는 크게 기울다가 드물게, 5단계에서는 방향을 잘못 잡으면 뒤집히도록 맞춘 값이다.
+ */
+export const BREAKING_STEEPNESS = 0.24;
+
 /** 한 지점을 지나고 있는 파도의 마루가 얼마나 가파른지를 나타낸다. */
 export interface Crest {
   /**

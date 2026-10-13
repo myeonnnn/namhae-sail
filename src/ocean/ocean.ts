@@ -8,6 +8,8 @@ import { sunlight, type SunPosition } from '../environment/sun';
 import type { Wind } from '../environment/wind';
 import { createWaterNormals } from './waterNormals';
 
+// 강풍에 날리는 물보라가 보이기 시작하는 풍속과 가장 짙어지는 풍속 (m/s)
+const SPINDRIFT_WIND = [13, 30] as const;
 const SKY_CUBE_SIZE = 256;
 // 이 거리에서 물체의 색상이 약 63%만큼 수평선의 색상으로 바뀐다.
 const HAZE_DISTANCE = 9000;
@@ -173,6 +175,10 @@ export class Ocean {
     });
     // 바람이 없으면 잔물결이 사라져서 수면이 거울처럼 매끄러워진다.
     uniforms['uRippleStrength'].value = 0.15 + 0.85 * THREE.MathUtils.smoothstep(wind.speed, 0, 9);
+    // 풍향은 불어오는 쪽이므로, 물보라는 그 반대쪽으로 날린다. 초속 13m 부근부터 보이기 시작한다.
+    const toward = THREE.MathUtils.degToRad(wind.fromDeg + 180);
+    (uniforms['uWindDirection'].value as THREE.Vector2).set(Math.sin(toward), -Math.cos(toward));
+    uniforms['uSpindrift'].value = THREE.MathUtils.smoothstep(wind.speed, SPINDRIFT_WIND[0], SPINDRIFT_WIND[1]);
     uniforms['uTime'].value = elapsed;
     uniforms['uPixelAngle'].value = THREE.MathUtils.degToRad(camera.fov) / viewportHeight;
     // 파도는 월드 좌표를 기준으로 계산되므로 격자를 옮겨도 파도가 따라 움직이지 않는다.

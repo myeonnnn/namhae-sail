@@ -1,4 +1,4 @@
-import { sampleCrest, sampleWaveHeight } from '../ocean/waves';
+import { BREAKING_STEEPNESS, sampleCrest, sampleWaveHeight } from '../ocean/waves';
 import { apparentWind, type ShipState } from './shipPhysics';
 import type { ShipSpec } from './shipSpec';
 
@@ -6,10 +6,6 @@ import type { ShipSpec } from './shipSpec';
 const HULL_SAMPLES_ALONG = [-0.42, -0.28, -0.14, 0, 0.14, 0.28, 0.42];
 const HULL_SAMPLES_ACROSS = [-0.35, 0, 0.35];
 const SAMPLE_COUNT = HULL_SAMPLES_ALONG.length * HULL_SAMPLES_ACROSS.length;
-// 마루의 가파름이 이 값을 넘으면 부서지는 것으로 본다.
-// 하나의 파도는 0.4 부근에서 부서지지만, 이 프로젝트의 수면은 파도 12개의 합이어서 실제 바다보다 완만하다.
-// 파도 세기 3단계에서는 기울기만 하고, 4단계에서는 크게 기울다가 드물게, 5단계에서는 방향을 잘못 잡으면 뒤집히도록 맞춘 값이다.
-const BREAKING_STEEPNESS = 0.24;
 // 빠르게 달릴수록 마루에 세게 부딪힌다. 속력이 이 값(m/s)만큼 늘 때마다 충격이 정지해 있을 때의 크기만큼 더해진다.
 const IMPACT_SPEED_SCALE = 20;
 // 고속으로 가파른 마루를 넘으면 선체가 떠올랐다가 떨어지면서, 파도를 받는 방향과 관계없이 기울어진 수면 쪽으로 넘어간다.

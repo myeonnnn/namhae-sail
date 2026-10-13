@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WAVES } from './waves';
+import { BREAKING_STEEPNESS, WAVES } from './waves';
 
 const waveUniforms = /* glsl */ `
   uniform float uTime;
@@ -43,6 +43,11 @@ const fragmentShader = /* glsl */ `
   uniform float uPixelAngle;
   uniform float uHazeDistance;
   uniform float uRippleStrength;
+  // 마루가 부서지기 시작하는 가파름. 선체를 넘어뜨리는 힘의 계산과 같은 값이다.
+  uniform float uBreakingSteepness;
+  // 바람이 불어 가는 방향 (월드의 x, z)과, 강풍에 날리는 물보라의 세기 (0~1)
+  uniform vec2 uWindDirection;
+  uniform float uSpindrift;
   uniform vec3 uSunDirection;
   uniform vec3 uSunColor;
   uniform vec3 uDeepColor;
@@ -67,6 +72,7 @@ const fragmentShader = /* glsl */ `
     // 따라서 격자가 성긴 곳에서도 빛의 반사는 세밀하게 표현된다.
     vec2 slope = vec2(0.0);
     float pinch = 0.0;
+    float breaker = 0.0;
     for (int i = 0; i < WAVE_COUNT; i++) {
       vec4 shape = uWaveShape[i];
       vec4 motion = uWaveMotion[i];
@@ -75,6 +81,7 @@ const fragmentShader = /* glsl */ `
       float theta = shape.z * dot(shape.xy, vBasePosition) - motion.x * uTime;
       slope += shape.xy * steepness * cos(theta);
       pinch += motion.y * steepness * sin(theta);
+      breaker += steepness * sin(theta);
     }
 
     // 파도의 수식으로 표현하지 않는 잔물결은 서로 다른 크기와 속도로 흐르는 노멀 맵 세 장으로 보탠다.
@@ -116,11 +123,34 @@ const fragmentShader = /* glsl */ `
     float foam = smoothstep(0.3, 0.46, pinch + 0.12 * foamNoise) * rippleFade;
     foam *= smoothstep(-0.15, 0.25, rippleSmall.x + rippleMedium.y);
 
+    // 선체를 넘어뜨릴 만큼 가파른 마루에는 넓게 부서지는 물거품을 얹는다.
+    // 물리 계산과 같은 기준을 사용하므로, 화면에서 희게 부서지는 마루가 곧 피해야 할 마루이다.
+    // 가장자리로 갈수록 잔물결의 무늬를 따라 끊어지게 해서, 매끈한 덩어리로 보이지 않게 한다.
+    float breakingAmount = smoothstep(uBreakingSteepness - 0.03, uBreakingSteepness + 0.09, breaker);
+    float breakingNoise = 0.5 + 0.5 * clamp(rippleSmall.x * 0.9 + rippleMedium.y * 0.7 + rippleLarge.x * 0.5, -1.0, 1.0);
+    float breaking = smoothstep(1.0 - breakingAmount, 1.25 - breakingAmount, breakingNoise) * step(0.001, breakingAmount) * rippleFade;
+
+    // 강풍은 마루의 물거품을 날려서, 수면에 바람이 불어 가는 방향으로 길게 늘어진 흰 줄을 만든다.
+    // 바람과 나란한 방향으로는 길게, 가로지르는 방향으로는 촘촘하게 무늬를 읽고, 바람을 따라 흘려보낸다.
+    // 바람이 약해서 보이지 않을 때에는 무늬를 읽지 않는다.
+    float spindrift = 0.0;
+    if (uSpindrift > 0.001) {
+      vec2 windSide = vec2(-uWindDirection.y, uWindDirection.x);
+      vec2 streakUv = vec2(dot(vBasePosition, uWindDirection) / 210.0 - uTime * 0.07, dot(vBasePosition, windSide) / 19.0);
+      float streakPattern = texture2D(uDetailNormals, streakUv).x * 0.6 + texture2D(uDetailNormals, streakUv * vec2(0.53, 1.9) + 0.37).y * 0.4;
+      float streakFade = 1.0 - smoothstep(120.0, 1500.0, cameraDistance);
+      // 줄이 끝없이 이어지지 않도록, 잔물결의 무늬로 군데군데 끊는다.
+      float streakBreak = smoothstep(-0.25, 0.35, rippleLarge.x + rippleMedium.y);
+      spindrift = smoothstep(0.57, 0.74, streakPattern) * streakBreak * uSpindrift * streakFade;
+    }
+
     // 항적의 물거품은 세기가 약해질수록 잔물결의 무늬를 따라 듬성듬성하게 끊어진다.
     float wakeNoise = 0.5 + 0.5 * clamp(rippleMedium.x * 0.7 + rippleSmall.y * 0.7 + rippleLarge.x * 0.4, -1.0, 1.0);
     float wakeFoam = smoothstep(1.0 - wake, 1.35 - wake, wakeNoise) * step(0.01, wake);
     foam = max(foam, wakeFoam);
     color = mix(color, vec3(0.85, 0.9, 0.92) * (0.5 + 0.6 * sunFacing), foam * 0.75);
+    // 부서지는 마루는 두꺼운 물거품이어서 햇빛의 방향과 관계없이 밝고, 날리는 물보라는 수면을 옅게 덮는다.
+    color = mix(color, vec3(1.25, 1.3, 1.33) * (0.75 + 0.35 * sunFacing), max(breaking * 0.92, spindrift * 0.26));
 
     // 먼 수면을 그 방향의 수평선 색상으로 수렴시켜서 바다의 끝과 하늘의 경계를 감춘다.
     vec3 horizonColor = textureCube(uSky, normalize(vec3(-viewDirection.x, 0.03, -viewDirection.z)), 1.5).rgb;
@@ -157,6 +187,9 @@ export function createOceanMaterial({
       uPixelAngle: { value: 0.0015 },
       uHazeDistance: { value: hazeDistance },
       uRippleStrength: { value: 1 },
+      uBreakingSteepness: { value: BREAKING_STEEPNESS },
+      uWindDirection: { value: new THREE.Vector2(0, -1) },
+      uSpindrift: { value: 0 },
       uSunDirection: { value: sunDirection },
       uSunColor: { value: new THREE.Color(1.0, 0.86, 0.66).multiplyScalar(30) },
       uDeepColor: { value: new THREE.Color(0.004, 0.034, 0.062) },
