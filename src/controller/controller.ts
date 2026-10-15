@@ -158,6 +158,23 @@ if (!window.isSecureContext) {
   startTilt();
 }
 
+// ---- 화면 꺼짐 방지 ----
+
+// 기울기로만 조타하면 화면을 만지지 않는 시간이 길어서, 자동 잠금으로 화면이 꺼지고 연결이 끊긴다.
+// 다른 앱에 다녀오면 잠금이 풀리므로 돌아올 때마다 다시 요청한다. 지원하지 않는 브라우저에서는 그냥 넘어간다.
+async function keepScreenOn(): Promise<void> {
+  if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+  try {
+    await navigator.wakeLock.request('screen');
+  } catch {
+    // 배터리 절약 모드처럼 브라우저가 거절하는 경우가 있다. 조종에는 지장이 없으므로 무시한다.
+  }
+}
+void keepScreenOn();
+document.addEventListener('visibilitychange', () => void keepScreenOn());
+// 사용자가 화면을 만진 뒤에만 허락하는 브라우저도 있으므로, 처음 만질 때 한 번 더 요청한다.
+document.addEventListener('pointerdown', () => void keepScreenOn(), { once: true });
+
 // ---- 연결 ----
 
 // 주소에 게임 ID가 있으면 QR 코드로 연 핸드폰이므로 그 게임에 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.

@@ -1,7 +1,7 @@
 import './style.css';
 import { HelmHost } from './controller/link';
 import { decodeHelm, encodeShipStatus, isNewPress } from './controller/protocol';
-import { chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
+import { checkRemoteLink, chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
 import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
@@ -284,6 +284,8 @@ let remoteHelm: RemoteHelm | undefined;
 // 중립과 복구는 누른 횟수로 오므로, 직전 횟수와 비교해서 새로 누른 것만 다음 단계에 한 번 반영한다.
 let pressCounts: { neutral?: number; reset?: number } = {};
 let remoteNeutral = false;
+// 직전 물리 단계에 핸드폰의 메시지가 오고 있었는지. 끊긴 순간을 알아채서 스로틀을 중립으로 돌리는 데 쓴다.
+let remoteLinkActive = false;
 let remoteReset = false;
 const helmHost = new HelmHost((text) => {
   const message = decodeHelm(text);
@@ -332,11 +334,16 @@ startLoop({
     }
     stepStart.x = ship.state.x;
     stepStart.z = ship.state.z;
-    let helm = chooseHelm(keyboardHelm(input), isHelmKeyDown(input), remoteHelm, performance.now() / 1000);
-    if (remoteNeutral) {
+    const now = performance.now() / 1000;
+    const keyboardActive = isHelmKeyDown(input);
+    const link = checkRemoteLink(remoteLinkActive, keyboardActive, remoteHelm, now);
+    remoteLinkActive = link.active;
+    let helm = chooseHelm(keyboardHelm(input), keyboardActive, remoteHelm, now);
+    if (remoteNeutral || link.neutral) {
       helm = { ...helm, neutral: true };
       remoteNeutral = false;
     }
+    if (link.neutral) hud.showTip('핸드폰 연결이 끊겨서 스로틀을 중립으로 돌렸습니다.');
     ship.update(dt, helm, windVelocity(wind));
     // 충돌을 처리하면 속도가 0이 되므로, 연출에 사용할 속력을 먼저 기록한다.
     const { surge, sway } = ship.state;

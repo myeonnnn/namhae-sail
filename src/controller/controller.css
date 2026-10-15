@@ -142,6 +142,22 @@ button {
   box-shadow: 0 0 6px var(--starboard);
 }
 
+/* 다시 연결하는 동안에는 주황색 점을 깜빡여서, 끊긴 상태이지만 기다리면 된다는 것을 알린다. */
+.status[data-status='reconnecting'] {
+  color: var(--astern);
+}
+
+.status[data-status='reconnecting']::before {
+  background: var(--astern);
+  animation: blink 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.25;
+  }
+}
+
 .status[data-status='disconnected'] {
   color: var(--port);
 }
