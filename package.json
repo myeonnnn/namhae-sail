@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:harness": "node scripts/harness/verify.mjs"
   },
   "dependencies": {
     "ol": "^10.11.0",

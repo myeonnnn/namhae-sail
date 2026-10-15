@@ -13,6 +13,7 @@ pnpm vitest run --project unit          # 단위 테스트만 (코드를 고칠 
 pnpm vitest run --project integration   # 통합 테스트만
 pnpm vitest run --project browser       # WebGL이 필요한 테스트만 (설치된 Chrome을 헤드리스로 사용)
 pnpm build        # typecheck + vite build
+pnpm verify:harness [--runs 5] [--skip-faults]   # 테스트 하네스 검증: 분류, 시간 한도, 불안정, 오류 주입 (약 20초)
 npx prettier --single-quote --print-width 120 --write <파일>
 ```
 
@@ -48,6 +49,7 @@ npx prettier --single-quote --print-width 120 --write <파일>
 
 - 수 분이 걸리는 통계 측정(전복 빈도 등)은 테스트가 아니라 측정 스크립트로 둔다.
 - 눈으로 판단해야 하는 것(물거품의 모양, 움직임)은 테스트로 만들지 않고 화면으로 확인한다.
+- 테스트가 실제로 오류를 잡는지는 `scripts/harness/faults.mjs`의 오류 주입 목록으로 확인한다. 새로 생긴 위험한 지점(부호, 좌표 변환, CPU와 GPU의 공유 수식)은 이 목록에 추가한다.
 
 ## 기능을 만드는 순서 (테스트 먼저)
 
