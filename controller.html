@@ -17,6 +17,10 @@
           <div id="status" class="status" data-status="connecting">연결 중</div>
           <p id="link-notice" class="notice" hidden></p>
         </div>
+        <button id="menu-open" class="action menu-open" type="button">
+          <span class="glyph" aria-hidden="true">☰</span>
+          <span class="caption">메뉴</span>
+        </button>
         <button id="reset" class="action reset" type="button" aria-label="복구">
           <span class="glyph" aria-hidden="true">↻</span>
           <span class="caption">복구</span>
@@ -24,6 +28,7 @@
       </section>
 
       <section class="center">
+        <div id="race-info" class="race-info" hidden></div>
         <div class="readout">
           <span class="readout-label">타</span>
           <output id="rudder-value">0%</output>
@@ -62,7 +67,10 @@
           <div id="gauge-fill" class="gauge-fill"></div>
         </div>
       </section>
+      <div id="countdown" class="countdown" aria-live="polite" hidden></div>
     </main>
+    <!-- 조종 화면이 아닐 때(연결 대기, 불러오는 중, 시작, 결과, 메뉴) 조종 화면을 덮는다. 내용은 상황에 따라 스크립트가 채운다. -->
+    <section id="overlay" class="overlay" hidden></section>
     <div class="rotate-notice">핸드폰을 가로로 돌려 주세요.</div>
     <script type="module" src="/src/controller/controller.ts"></script>
   </body>
