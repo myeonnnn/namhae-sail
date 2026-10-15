@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Namhae Sail 컨트롤러</title>
+    <meta name="theme-color" content="#0b1a2a" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <main class="pad">
+      <section class="throttle">
+        <div class="label">스로틀 <output id="throttle-value">0%</output></div>
+        <div
+          id="throttle"
+          class="track vertical"
+          role="slider"
+          aria-label="스로틀"
+          aria-valuemin="-100"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <div class="center-line"></div>
+          <div class="thumb"></div>
+        </div>
+        <button id="neutral" type="button">중립</button>
+      </section>
+      <section class="rudder">
+        <div class="label">타 <output id="rudder-value">0%</output></div>
+        <div
+          id="rudder"
+          class="track horizontal"
+          role="slider"
+          aria-label="타"
+          aria-valuemin="-100"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <div class="center-line"></div>
+          <div class="thumb"></div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/controller/controller.ts"></script>
+  </body>
+</html>

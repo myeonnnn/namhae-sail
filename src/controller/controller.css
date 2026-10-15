@@ -1,0 +1,139 @@
+:root {
+  --surface: rgba(232, 241, 248, 0.08);
+  --border: rgba(232, 241, 248, 0.2);
+  --text: #e8f1f8;
+  --muted: rgba(232, 241, 248, 0.62);
+  --ahead: #7fd0ff;
+  --astern: #ffb45c;
+  --font: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1a2a;
+  color: var(--text);
+  font-family: var(--font);
+  /* 슬라이더를 끄는 동안 화면이 스크롤되거나 확대되거나 글자가 선택되지 않도록 한다. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.pad {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+}
+
+.label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.label output {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 스로틀은 화면의 대부분을 차지해서, 엄지를 크게 움직여 세밀하게 맞출 수 있게 한다. */
+.throttle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.track {
+  position: relative;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.track.vertical {
+  flex: 1;
+  width: min(140px, 40vw);
+  align-self: center;
+}
+
+.track.horizontal {
+  height: 96px;
+}
+
+.center-line {
+  position: absolute;
+  background: var(--border);
+}
+
+.vertical .center-line {
+  left: 12px;
+  right: 12px;
+  top: 50%;
+  height: 2px;
+}
+
+.horizontal .center-line {
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  width: 2px;
+}
+
+.thumb {
+  position: absolute;
+  border-radius: 14px;
+  background: var(--text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.vertical .thumb {
+  left: 8px;
+  right: 8px;
+  height: 64px;
+  top: calc(var(--pos, 0.5) * (100% - 64px));
+}
+
+.horizontal .thumb {
+  top: 8px;
+  bottom: 8px;
+  width: 64px;
+  left: calc(var(--pos, 0.5) * (100% - 64px));
+}
+
+/* 손을 떼면 가운데로 돌아오는 움직임이 보이도록, 끄는 중이 아닐 때만 애니메이션을 준다. */
+.horizontal:not(.dragging) .thumb {
+  transition: left 0.15s ease-out;
+}
+
+.thumb.ahead {
+  background: var(--ahead);
+}
+
+.thumb.astern {
+  background: var(--astern);
+}
+
+#neutral {
+  margin-top: 12px;
+  height: 64px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: 600 18px var(--font);
+}
+
+#neutral:active {
+  background: rgba(232, 241, 248, 0.2);
+}

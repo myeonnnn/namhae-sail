@@ -1,4 +1,6 @@
 import './style.css';
+import { decodeHelm, HELM_CHANNEL } from './controller/protocol';
+import { chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
 import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
@@ -273,6 +275,14 @@ let assetsDone = false;
 void assetsLoaded.then(() => (assetsDone = true));
 window.setTimeout(() => startScreen.markReady(), 15000);
 
+// 컨트롤러 페이지가 보낸 마지막 조종 값. 받은 시각을 함께 두어, 메시지가 끊기면 키보드로 돌아간다.
+// 형식이 맞지 않는 메시지는 버리고 직전 값을 그대로 둔다.
+let remoteHelm: RemoteHelm | undefined;
+new BroadcastChannel(HELM_CHANNEL).addEventListener('message', (event: MessageEvent) => {
+  const message = typeof event.data === 'string' ? decodeHelm(event.data) : undefined;
+  if (message) remoteHelm = { ...message, receivedAt: performance.now() / 1000 };
+});
+
 // 물리의 한 스텝에서 선박이 이동하기 전의 위치. 관문을 지났는지 판정하는 데 사용한다.
 const stepStart = { x: 0, z: 0 };
 
@@ -289,7 +299,8 @@ startLoop({
     }
     stepStart.x = ship.state.x;
     stepStart.z = ship.state.z;
-    ship.update(dt, input, windVelocity(wind));
+    const helm = chooseHelm(keyboardHelm(input), isHelmKeyDown(input), remoteHelm, performance.now() / 1000);
+    ship.update(dt, helm, windVelocity(wind));
     // 충돌을 처리하면 속도가 0이 되므로, 연출에 사용할 속력을 먼저 기록한다.
     const { surge, sway } = ship.state;
     const impactSpeed = Math.hypot(surge, sway);

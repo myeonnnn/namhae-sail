@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import type { Input } from '../core/input';
+import { applyHelm, type HelmCommand } from '../core/helm';
 import { stepRoll, type RollState } from './rollDynamics';
 import { measureSeaLoad } from './seakeeping';
 import { createShipState, stepShip, type ShipControls, type ShipState } from './shipPhysics';
@@ -45,7 +45,7 @@ export class Ship {
     this.ready = this.loadModel().catch((error) => console.warn('선박의 모델을 불러오지 못했습니다.', error));
   }
 
-  update(dt: number, input: Input, wind: { x: number; z: number }): void {
+  update(dt: number, helm: HelmCommand, wind: { x: number; z: number }): void {
     const { controls, spec } = this;
 
     if (this.capsized) {
@@ -63,17 +63,7 @@ export class Ship {
       return;
     }
 
-    // 스로틀은 레버처럼 놓은 위치에 머무르고, 타는 키를 놓으면 중앙으로 복귀한다.
-    const throttleInput = input.axis(['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']);
-    controls.throttle = THREE.MathUtils.clamp(
-      controls.throttle + throttleInput * spec.controls.throttleRate * dt,
-      -1,
-      1,
-    );
-    if (input.isDown('Space')) controls.throttle = 0;
-
-    const rudderTarget = input.axis(['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']);
-    controls.rudder = moveToward(controls.rudder, rudderTarget, spec.controls.rudderRate * dt);
+    applyHelm(controls, helm, spec.controls, dt);
 
     // 전진과 후진 모두 스로틀을 올릴수록 회전수가 높아진다. 엔진은 레버를 움직여도 즉시 반응하지 않는다.
     const { idleRpm, maxRpm, response } = spec.engine;
@@ -174,9 +164,4 @@ export class Ship {
     });
     this.object.add(model);
   }
-}
-
-function moveToward(current: number, target: number, maxDelta: number): number {
-  const delta = target - current;
-  return Math.abs(delta) <= maxDelta ? target : current + Math.sign(delta) * maxDelta;
 }
