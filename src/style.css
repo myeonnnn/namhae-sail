@@ -806,6 +806,31 @@ body {
   border-radius: 14px;
 }
 
+/* 핸드폰 연결 안내를 덧붙이면 카드를 넓혀서 두 칸으로 나눈다. */
+.start-card-wide {
+  width: min(900px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 28px;
+}
+
+.start-aside {
+  padding-left: 28px;
+  border-left: 1px solid var(--hud-border);
+}
+
+@media (max-width: 760px) {
+  .start-card-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .start-aside {
+    padding: 20px 0 0;
+    border-left: none;
+    border-top: 1px solid var(--hud-border);
+  }
+}
+
 .start-card h1 {
   display: flex;
   align-items: center;
@@ -1265,9 +1290,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 240px;
   color: var(--hud-text);
   font: 13px/1.5 var(--hud-font);
+}
+
+.hud-phone-menu {
+  width: 260px;
 }
 
 .hud-phone-status {
@@ -1300,12 +1328,27 @@ body {
   height: 100%;
 }
 
-.hud-phone-link {
-  color: var(--hud-ahead);
-  font-size: 11px;
-  word-break: break-all;
+/* 메뉴가 화면 아래의 조작대를 가리지 않도록 QR 코드는 카메라가 읽을 수 있는 만큼만 크게 둔다. */
+.hud-phone-start .hud-phone-qr,
+.hud-phone-menu .hud-phone-qr {
+  width: 170px;
+  align-self: center;
 }
 
+.hud-phone-start .hud-phone-status {
+  text-align: center;
+}
+
+/* 시작 화면의 h2 스타일(작은 회색 제목)보다 우선하도록 카드 안에서도 지정한다. */
+.hud-phone-title,
+.start-card .hud-phone-title {
+  margin: 0;
+  color: var(--hud-text);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.hud-phone-intro,
 .hud-phone-hint,
 .hud-phone-warning {
   margin: 0;
@@ -1314,4 +1357,33 @@ body {
 
 .hud-phone-warning {
   color: var(--hud-astern);
+}
+
+.hud-phone-steps {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.hud-phone-steps li + li {
+  margin-top: 2px;
+}
+
+.hud-phone-requirements {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 4px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--hud-border);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.hud-phone-requirements dt {
+  white-space: nowrap;
+}
+
+.hud-phone-requirements dd {
+  margin: 0;
+  color: var(--hud-text-muted);
 }

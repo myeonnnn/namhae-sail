@@ -20,6 +20,7 @@ export class StartScreen {
   dismissed = false;
 
   private readonly overlay = document.createElement('div');
+  private readonly card = document.createElement('div');
   private readonly status = document.createElement('div');
   private readonly button = document.createElement('button');
   private readonly raceButton = document.createElement('button');
@@ -33,7 +34,7 @@ export class StartScreen {
     const { overlay, status, button, raceButton } = this;
     overlay.className = 'start-screen';
 
-    const card = document.createElement('div');
+    const { card } = this;
     card.className = 'start-card';
 
     const title = document.createElement('h1');
@@ -51,7 +52,7 @@ export class StartScreen {
     card.append(title, summary);
 
     // 키보드 없이 터치로만 조작하는 기기에서는 배를 조종할 수 없으므로 미리 알린다.
-    if (window.matchMedia('(pointer: coarse) and (hover: none)').matches) {
+    if (isTouchOnly()) {
       const notice = document.createElement('p');
       notice.className = 'start-notice';
       notice.textContent =
@@ -112,6 +113,25 @@ export class StartScreen {
     });
   }
 
+  /**
+   * 카드를 넓혀서 오른쪽에 내용을 덧붙인다. 핸드폰을 컨트롤러로 연결하는 안내에 쓴다.
+   * 휴대전화나 태블릿처럼 터치로만 조작하는 기기에서는 덧붙이지 않는다. 그 기기 자체가 핸드폰이기 때문이다.
+   * @returns 덧붙였으면 true
+   */
+  addAside(content: HTMLElement): boolean {
+    if (isTouchOnly()) return false;
+    const { card } = this;
+    const main = document.createElement('div');
+    main.className = 'start-main';
+    main.append(...card.childNodes);
+    const aside = document.createElement('aside');
+    aside.className = 'start-aside';
+    aside.append(content);
+    card.append(main, aside);
+    card.classList.add('start-card-wide');
+    return true;
+  }
+
   /** 자료를 모두 불러왔을 때 호출한다. 진행 상태를 지우고 시작 버튼을 보여 준다. */
   markReady(): void {
     if (this.ready) return;
@@ -128,4 +148,8 @@ export class StartScreen {
     // 서서히 사라지는 동안에도 아래의 화면을 조작할 수 있도록, 사라진 뒤에 요소를 제거한다.
     window.setTimeout(() => this.overlay.remove(), 400);
   }
+}
+
+function isTouchOnly(): boolean {
+  return window.matchMedia('(pointer: coarse) and (hover: none)').matches;
 }

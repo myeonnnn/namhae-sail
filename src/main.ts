@@ -296,10 +296,16 @@ const helmHost = new HelmHost((text) => {
 // 컨트롤러는 레버를 미는 방향만 보내므로, 스로틀이 지금 몇 %인지는 게임이 알려 준다.
 const STATUS_INTERVAL = 0.1;
 let statusSentAt = -Infinity;
-const phonePanel = new PhonePanel();
-hud.setMenuContent('phone', phonePanel.element, () =>
-  helmHost.open((status, peerId) => phonePanel.setStatus(status, peerId)),
-);
+// 메뉴와 시작 화면의 QR 코드는 같은 연결을 쓴다. 시작 화면에서 연결한 핸드폰은 시작 화면을 닫아도 그대로 남는다.
+const phonePanels = [new PhonePanel('menu')];
+const openPhoneLink = () =>
+  helmHost.open((status, peerId) => phonePanels.forEach((panel) => panel.setStatus(status, peerId)));
+hud.setMenuContent('phone', phonePanels[0].element, openPhoneLink);
+const startPhonePanel = new PhonePanel('start');
+if (startScreen.addAside(startPhonePanel.element)) {
+  phonePanels.push(startPhonePanel);
+  openPhoneLink();
+}
 
 // 물리의 한 스텝에서 선박이 이동하기 전의 위치. 관문을 지났는지 판정하는 데 사용한다.
 const stepStart = { x: 0, z: 0 };
