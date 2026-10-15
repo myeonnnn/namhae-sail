@@ -74,14 +74,32 @@ describe('controllerScreen: 게임이 알려 준 상황에 맞는 화면', () =>
 });
 
 /** 기울기와 버튼을 모두 쓰고 있는 조종 값. 0이 아닌 값이어야 조종 화면이 아닐 때 바뀌는지 알 수 있다. */
-const ACTIVE_HELM: HelmMessage = { throttleRate: 1, rudder: -0.7, neutralCount: 3, resetCount: 5 };
+const ACTIVE_HELM: HelmMessage = {
+  throttleRate: 1,
+  rudder: -0.7,
+  neutralCount: 3,
+  resetCount: 5,
+  viewResetCount: 2,
+  viewX: 140,
+  viewY: -36,
+  session: 'a1',
+};
 
 /** 조종 값의 경계: 레버를 끝까지 내리고 타를 우현 끝까지, 누른 횟수 0 */
 const EDGE_HELMS: HelmMessage[] = [
   ACTIVE_HELM,
-  { throttleRate: -1, rudder: 1, neutralCount: 0, resetCount: 0 },
-  { throttleRate: 0.25, rudder: 0.4, neutralCount: 12, resetCount: 0 },
-  { throttleRate: 0, rudder: 0, neutralCount: 0, resetCount: 7 },
+  { throttleRate: -1, rudder: 1, neutralCount: 0, resetCount: 0, viewResetCount: 0, viewX: 0, viewY: 0, session: 'a1' },
+  {
+    throttleRate: 0.25,
+    rudder: 0.4,
+    neutralCount: 12,
+    resetCount: 0,
+    viewResetCount: 4,
+    viewX: -800,
+    viewY: 2.5,
+    session: 'b2',
+  },
+  { throttleRate: 0, rudder: 0, neutralCount: 0, resetCount: 7, viewResetCount: 0, viewX: 0, viewY: 0, session: 'c3' },
 ];
 
 describe('helmForScreen: 화면에 따라 보내는 조종 값', () => {

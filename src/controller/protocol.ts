@@ -8,6 +8,14 @@ export interface HelmMessage {
   neutralCount: number;
   /** 컨트롤러를 연 뒤로 복구 버튼을 누른 횟수 (0 이상의 정수) */
   resetCount: number;
+  /** 컨트롤러를 연 뒤로 "시점 초기화"를 누른 횟수 (0 이상의 정수) */
+  viewResetCount: number;
+  /** 컨트롤러를 연 뒤로 시점 영역을 가로로 끈 거리의 합 (CSS px, 오른쪽이 양수) */
+  viewX: number;
+  /** 컨트롤러를 연 뒤로 시점 영역을 세로로 끈 거리의 합 (CSS px, 아래쪽이 양수) */
+  viewY: number;
+  /** 컨트롤러 페이지를 열 때마다 새로 정하는 문자열. 다시 열어서 누적 값이 처음부터 세어진 것을 알아채는 데 쓴다. */
+  session: string;
 }
 
 /** 게임이 컨트롤러에 알려 주는 배의 상태 */
@@ -25,25 +33,47 @@ export const HELM_CHANNEL = 'namhae-sail-helm';
 const HELM_TYPE = 'helm';
 const STATUS_TYPE = 'status';
 
-/** 조종 값을 전송할 문자열로 바꾼다. */
+/** 조종 값을 전송할 문자열로 바꾼다. 값을 검사하지 않고 그대로 적는다. 검사는 받는 쪽의 decodeHelm이 한다. */
 export function encodeHelm(message: HelmMessage): string {
-  const { throttleRate, rudder, neutralCount, resetCount } = message;
   // JSON은 NaN과 Infinity를 null로 적으므로, 받는 쪽에서 유한한 수가 아니라고 판정되어 무시된다.
-  return JSON.stringify({ type: HELM_TYPE, throttleRate, rudder, neutralCount, resetCount });
+  return JSON.stringify({ type: HELM_TYPE, ...message });
 }
 
 /**
  * 받은 문자열을 조종 값으로 읽는다. throttleRate와 rudder는 -1~1로 제한한다.
- * 형식이 맞지 않으면(조종 메시지가 아니거나, 값이 없거나, throttleRate와 rudder가 유한한 수가 아니거나,
- * 누른 횟수가 0 이상의 정수가 아니면) undefined를 돌려준다.
+ * 형식이 맞지 않으면 undefined를 돌려준다: 조종 메시지가 아니거나, 값이 없거나, throttleRate와 rudder와 viewX와 viewY가
+ * 유한한 수가 아니거나, 누른 횟수가 0 이상의 정수가 아니거나, session이 비어 있지 않은 문자열이 아닌 경우이다.
  */
 export function decodeHelm(text: string): HelmMessage | undefined {
   const data = parseObject(text);
   if (data?.type !== HELM_TYPE) return undefined;
-  const { throttleRate, rudder, neutralCount, resetCount } = data;
-  if (!isFiniteNumber(throttleRate) || !isFiniteNumber(rudder)) return undefined;
-  if (!isCount(neutralCount) || !isCount(resetCount)) return undefined;
-  return { throttleRate: clamp(throttleRate), rudder: clamp(rudder), neutralCount, resetCount };
+  const { throttleRate, rudder, neutralCount, resetCount, viewResetCount, viewX, viewY, session } = data;
+  if (![throttleRate, rudder, viewX, viewY].every(isFiniteNumber)) return undefined;
+  if (![neutralCount, resetCount, viewResetCount].every(isCount)) return undefined;
+  if (typeof session !== 'string' || session.length === 0) return undefined;
+  return {
+    throttleRate: clamp(throttleRate as number),
+    rudder: clamp(rudder as number),
+    neutralCount: neutralCount as number,
+    resetCount: resetCount as number,
+    viewResetCount: viewResetCount as number,
+    // 끈 거리는 누적한 값이라 범위가 없다. 제한하면 차이를 구할 때 끈 만큼이 사라진다.
+    viewX: viewX as number,
+    viewY: viewY as number,
+    session,
+  };
+}
+
+/**
+ * 시점 영역을 끈 거리 중, 직전 메시지 뒤로 새로 끈 만큼을 구한다.
+ * - 이 컨트롤러에서 처음 받은 메시지이거나(previous가 undefined), 컨트롤러를 새로 열어서 session이 바뀌었으면 { x: 0, y: 0 }
+ * - 그 밖에는 current와 previous의 viewX, viewY의 차이
+ * 누적한 값을 보내므로, 메시지를 몇 개 잃어도 다음 메시지에서 끈 만큼이 모두 반영되고, 같은 움직임이 두 번 반영되지 않는다.
+ */
+export function viewDragDelta(previous: HelmMessage | undefined, current: HelmMessage): { x: number; y: number } {
+  // 끈 거리는 양쪽으로 오가므로, 줄어든 것만으로는 다시 연 것인지 반대로 끈 것인지 알 수 없다. 그래서 session으로 가린다.
+  if (!previous || previous.session !== current.session) return { x: 0, y: 0 };
+  return { x: current.viewX - previous.viewX, y: current.viewY - previous.viewY };
 }
 
 /** 배의 상태를 전송할 문자열로 바꾼다. */

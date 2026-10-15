@@ -21,10 +21,10 @@
           <span class="glyph" aria-hidden="true">☰</span>
           <span class="caption">메뉴</span>
         </button>
-        <button id="reset" class="action reset" type="button" aria-label="복구">
-          <span class="glyph" aria-hidden="true">↻</span>
-          <span class="caption">복구</span>
-        </button>
+        <div id="view-pad" class="view-pad">
+          <span class="view-pad-label">끌어서 시점 돌리기</span>
+          <button id="view-reset" class="view-reset" type="button">시점 초기화</button>
+        </div>
       </section>
 
       <section class="center">
@@ -68,6 +68,11 @@
         </div>
       </section>
       <div id="countdown" class="countdown" aria-live="polite" hidden></div>
+      <!-- 복구 버튼은 배가 전복되었을 때만 떠오른다. 평소에는 자리를 차지하지 않는다. -->
+      <button id="reset" class="action reset" type="button" aria-label="복구" hidden>
+        <span class="glyph" aria-hidden="true">↻</span>
+        <span class="caption">복구</span>
+      </button>
     </main>
     <!-- 조종 화면이 아닐 때(연결 대기, 불러오는 중, 시작, 결과, 메뉴) 조종 화면을 덮는다. 내용은 상황에 따라 스크립트가 채운다. -->
     <section id="overlay" class="overlay" hidden></section>

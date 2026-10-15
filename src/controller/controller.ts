@@ -10,7 +10,17 @@ import { rudderFromRoll, screenRoll, smoothRoll } from './tilt';
 // 게임은 메시지가 0.5초 끊기면 키보드로 돌아가므로, 그보다 충분히 자주 보낸다.
 const SEND_INTERVAL_MS = 1000 / 30;
 
-const helm: HelmMessage = { throttleRate: 0, rudder: 0, neutralCount: 0, resetCount: 0 };
+// 페이지를 열 때마다 새 session을 정해서, 게임이 다시 연 컨트롤러의 누적 값을 이어 붙이지 않게 한다.
+const helm: HelmMessage = {
+  throttleRate: 0,
+  rudder: 0,
+  neutralCount: 0,
+  resetCount: 0,
+  viewResetCount: 0,
+  viewX: 0,
+  viewY: 0,
+  session: Math.random().toString(36).slice(2),
+};
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 
@@ -78,6 +88,36 @@ bindHold($('#throttle-down'), (value) => {
 $('#neutral').addEventListener('click', () => helm.neutralCount++);
 $('#reset').addEventListener('click', () => helm.resetCount++);
 
+// ---- 시점 ----
+
+// 왼쪽 영역을 끈 거리를 누적해서 보낸다. 게임은 직전 메시지와의 차이만큼 시점을 돌리므로, 메시지를 잃어도 끈 만큼은 반영된다.
+// 아이폰의 터치 이벤트는 movementX를 주지 않는 경우가 있어서, 직전 좌표와의 차이로 끈 거리를 구한다.
+const viewPad = $('#view-pad');
+let dragPointer: number | undefined;
+let dragLast = { x: 0, y: 0 };
+viewPad.addEventListener('pointerdown', (event) => {
+  if (dragPointer !== undefined || event.target !== viewPad) return;
+  dragPointer = event.pointerId;
+  dragLast = { x: event.clientX, y: event.clientY };
+  viewPad.setPointerCapture(event.pointerId);
+  viewPad.classList.add('dragging');
+});
+viewPad.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== dragPointer) return;
+  helm.viewX += event.clientX - dragLast.x;
+  helm.viewY += event.clientY - dragLast.y;
+  dragLast = { x: event.clientX, y: event.clientY };
+});
+const endDrag = (event: PointerEvent) => {
+  if (event.pointerId !== dragPointer) return;
+  dragPointer = undefined;
+  viewPad.classList.remove('dragging');
+};
+viewPad.addEventListener('pointerup', endDrag);
+viewPad.addEventListener('pointercancel', endDrag);
+viewPad.addEventListener('lostpointercapture', endDrag);
+$('#view-reset').addEventListener('click', () => helm.viewResetCount++);
+
 const throttleValue = $<HTMLOutputElement>('#throttle-value');
 const gaugeFill = $('#gauge-fill');
 const resetButton = $('#reset');
@@ -92,7 +132,7 @@ function showShipStatus(text: string): void {
   gaugeFill.style.top = `${50 - Math.max(0, throttle) * 50}%`;
   gaugeFill.style.height = `${Math.abs(throttle) * 50}%`;
   gaugeFill.style.background = throttle >= 0 ? 'var(--ahead)' : 'var(--astern)';
-  resetButton.classList.toggle('alert', capsized);
+  resetButton.hidden = !capsized;
 }
 
 // ---- 기울기 조타 ----

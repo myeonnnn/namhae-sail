@@ -448,6 +448,11 @@ body {
   font-size: 11px;
 }
 
+/* 키보드 안내와 핸드폰 안내 중 하나만 보이게 한다. */
+.hud-key-hints[hidden] {
+  display: none;
+}
+
 .hud-key-hints kbd {
   margin-right: 3px;
 }

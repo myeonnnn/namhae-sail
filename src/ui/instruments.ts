@@ -30,6 +30,8 @@ function tachArc(from: number, to: number): string {
 /** 조종하는 동안 계속 확인하는 값을 모은 계기판. 아래쪽에는 조종에 쓰는 기본 키만 표시하고, 전체 목록은 도움말 메뉴에 둔다. */
 export class Instruments {
   private readonly speed: HTMLElement;
+  private readonly keyHints: HTMLElement;
+  private readonly phoneHints: HTMLElement;
   private readonly heading: HTMLElement;
   private readonly course: HTMLElement;
   private readonly throttleFill: HTMLElement;
@@ -103,14 +105,21 @@ export class Instruments {
           <div class="hud-rudder-track"><div class="hud-rudder-fill"></div></div>
         </div>
       </div>
-      <div class="hud-key-hints">
+      <div class="hud-key-hints" data-ref="keyHints">
         <span><kbd>W</kbd><kbd>S</kbd>스로틀</span>
         <span><kbd>A</kbd><kbd>D</kbd>타</span>
         <span><kbd>Space</kbd>중립</span>
       </div>
+      <div class="hud-key-hints" data-ref="phoneHints" hidden>
+        <span><kbd>핸드폰</kbd>기울여서 타</span>
+        <span><kbd>▲</kbd><kbd>▼</kbd>스로틀</span>
+        <span><kbd>왼쪽</kbd>끌어서 시점</span>
+      </div>
     `;
     const ref = (name: string) => panel.querySelector<HTMLElement>(`[data-ref="${name}"]`)!;
     this.speed = ref('speed');
+    this.keyHints = ref('keyHints');
+    this.phoneHints = ref('phoneHints');
     this.heading = ref('heading');
     this.course = ref('course');
     this.throttleValue = ref('throttle');
@@ -125,6 +134,12 @@ export class Instruments {
     this.rudderFill = panel.querySelector<HTMLElement>('.hud-rudder-fill')!;
 
     root.append(panel);
+  }
+
+  /** 핸드폰으로 조종하는 동안에는 키보드 대신 핸드폰의 조작을 안내한다. */
+  setPhoneHints(phone: boolean): void {
+    this.keyHints.hidden = phone;
+    this.phoneHints.hidden = !phone;
   }
 
   update(

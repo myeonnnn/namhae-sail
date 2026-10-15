@@ -9,7 +9,7 @@ import {
   type GameSituation,
   type MenuItem,
 } from './controller/commands';
-import { decodeHelm, encodeShipStatus, isNewPress } from './controller/protocol';
+import { decodeHelm, encodeShipStatus, isNewPress, viewDragDelta, type HelmMessage } from './controller/protocol';
 import { checkRemoteLink, chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
 import { Input } from './core/input';
 import { Observer } from './core/observer';
@@ -293,7 +293,12 @@ window.setTimeout(() => startScreen.markReady(), 15000);
 // 형식이 맞지 않는 메시지는 버리고 직전 값을 그대로 둔다.
 let remoteHelm: RemoteHelm | undefined;
 // 중립과 복구는 누른 횟수로 오므로, 직전 횟수와 비교해서 새로 누른 것만 다음 단계에 한 번 반영한다.
-let pressCounts: { neutral?: number; reset?: number } = {};
+let pressCounts: { neutral?: number; reset?: number; viewReset?: number } = {};
+// 시점은 끈 거리의 누적 값으로 오므로, 직전 메시지와의 차이만큼 돌린다.
+let lastHelmMessage: HelmMessage | undefined;
+// 핸드폰의 시점 영역은 PC 화면보다 훨씬 좁아서, 같은 픽셀 비율로는 한 바퀴를 돌리려면 여러 번 끌어야 한다.
+// 영역을 한 번 가로질러 끌면(약 250px) 배를 반 바퀴쯤 돌도록 키운다.
+const PHONE_VIEW_DRAG_SCALE = 2.5;
 let remoteNeutral = false;
 // 직전 물리 단계에 핸드폰의 메시지가 오고 있었는지. 끊긴 순간을 알아채서 스로틀을 중립으로 돌리는 데 쓴다.
 let remoteLinkActive = false;
@@ -308,7 +313,13 @@ const helmHost = new HelmHost((text) => {
   if (!message) return;
   if (isNewPress(pressCounts.neutral, message.neutralCount)) remoteNeutral = true;
   if (isNewPress(pressCounts.reset, message.resetCount)) remoteReset = true;
-  pressCounts = { neutral: message.neutralCount, reset: message.resetCount };
+  if (isNewPress(pressCounts.viewReset, message.viewResetCount)) chaseCamera.resetView();
+  pressCounts = { neutral: message.neutralCount, reset: message.resetCount, viewReset: message.viewResetCount };
+  const drag = viewDragDelta(lastHelmMessage, message);
+  lastHelmMessage = message;
+  if (drag.x !== 0 || drag.y !== 0) {
+    chaseCamera.rotateBy(drag.x * PHONE_VIEW_DRAG_SCALE, drag.y * PHONE_VIEW_DRAG_SCALE);
+  }
   remoteHelm = { throttleRate: message.throttleRate, rudder: message.rudder, receivedAt: performance.now() / 1000 };
 });
 // 컨트롤러는 레버를 미는 방향만 보내므로, 스로틀이 지금 몇 %인지는 게임이 알려 준다.
@@ -410,6 +421,7 @@ const openPhoneLink = () =>
     // 연결되면 QR 코드는 더 볼 일이 없으므로 메뉴를 닫고, 메뉴를 열지 않아도 연결된 것을 알 수 있게 버튼에 표시한다.
     if (connected) hud.closeMenus();
     hud.setMenuLabel('phone', connected ? '핸드폰 연결됨' : undefined, connected ? 'connected' : undefined);
+    hud.setPhoneHints(connected);
   });
 hud.setMenuContent('phone', phonePanels[0].element, openPhoneLink);
 const startPhonePanel = new PhonePanel('start');

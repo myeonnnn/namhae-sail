@@ -188,26 +188,39 @@ button {
   color: var(--astern);
 }
 
+/* 전복되었을 때만 핸들 위에 떠오르는 복구 버튼. 빨갛게 깜빡여서 눈에 띄게 한다. */
 .reset {
-  width: min(120px, 26vh, 100%);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  margin-bottom: 8px;
-}
-
-.reset .glyph {
-  font-size: 34px;
-}
-
-/* 배가 전복되면 복구 버튼이 빨갛게 깜빡여서 눈에 띄게 한다. */
-.reset.alert {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  z-index: 2;
+  flex-direction: row;
+  gap: 10px;
+  padding: 14px 26px;
+  border-radius: 999px;
   border-color: var(--port);
   background: linear-gradient(180deg, #5a2025, #3d1518);
   animation: alert 0.9s ease-in-out infinite alternate;
 }
 
-.reset.alert .caption {
+.reset[hidden] {
+  display: none;
+}
+
+.reset .glyph {
+  font-size: 26px;
+}
+
+.reset .caption {
+  font-size: 17px;
+  font-weight: 600;
   color: #ffd2d2;
+}
+
+.reset.pressed,
+.reset:active {
+  transform: translateX(-50%) translateY(4px);
 }
 
 @keyframes alert {
@@ -411,6 +424,49 @@ body.tilt-off .wheel-rim {
 }
 
 /* 움직임을 줄이도록 설정한 사람에게는 애니메이션을 보이지 않는다. */
+/* ---- 왼쪽: 시점 영역 ---- */
+
+/* 엄지로 끌어서 시점을 돌리는 영역. 버튼과 구별되도록 오목하게 들어간 판으로 보이게 한다. */
+.view-pad {
+  flex: 1;
+  align-self: stretch;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+  border-radius: 18px;
+  border: 1px dashed var(--key-edge);
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.view-pad.dragging {
+  border-style: solid;
+  border-color: var(--ahead);
+}
+
+.view-pad-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.view-reset {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--key-edge);
+  background: var(--key);
+  font-size: 13px;
+}
+
+.view-reset:active {
+  background: var(--key-pressed);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .enable-tilt,
   .enable-tilt::before,

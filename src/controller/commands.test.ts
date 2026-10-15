@@ -135,7 +135,18 @@ describe('핸드폰이 보내는 명령', () => {
 
   it('같은 통로로 오는 조종, 배의 상태, 상황 메시지는 명령으로 읽지 않는다', () => {
     expect(
-      decodeCommand(encodeHelm({ throttleRate: 1, rudder: -0.5, neutralCount: 2, resetCount: 1 })),
+      decodeCommand(
+        encodeHelm({
+          throttleRate: 1,
+          rudder: -0.5,
+          neutralCount: 2,
+          resetCount: 1,
+          viewResetCount: 1,
+          viewX: 30,
+          viewY: -12,
+          session: 's1',
+        }),
+      ),
     ).toBeUndefined();
     expect(decodeCommand(encodeShipStatus({ throttle: 0.5, capsized: true }))).toBeUndefined();
     for (const scene of ALL_SCENES) {
@@ -262,7 +273,18 @@ describe('게임이 알려 주는 상황', () => {
 
   it('같은 통로로 오는 조종, 배의 상태, 명령 메시지는 상황으로 읽지 않는다', () => {
     expect(
-      decodeSituation(encodeHelm({ throttleRate: 0, rudder: 0.3, neutralCount: 0, resetCount: 0 })),
+      decodeSituation(
+        encodeHelm({
+          throttleRate: 0,
+          rudder: 0.3,
+          neutralCount: 0,
+          resetCount: 0,
+          viewResetCount: 0,
+          viewX: 0,
+          viewY: 0,
+          session: 's1',
+        }),
+      ),
     ).toBeUndefined();
     expect(decodeSituation(encodeShipStatus({ throttle: -1, capsized: false }))).toBeUndefined();
     for (const command of VALID_COMMANDS) {

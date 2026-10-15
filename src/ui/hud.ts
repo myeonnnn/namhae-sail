@@ -189,6 +189,11 @@ export class Hud {
     this.environment.selectLevel(level);
   }
 
+  /** 화면 아래의 조작 안내를 핸드폰용으로 바꾸거나 되돌린다. */
+  setPhoneHints(phone: boolean): void {
+    this.instruments.setPhoneHints(phone);
+  }
+
   closeMenus(): void {
     for (const menu of Object.values(this.menus)) menu.close();
   }

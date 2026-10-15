@@ -37,8 +37,7 @@ export class ChaseCamera {
     element.addEventListener('pointerdown', (event) => element.setPointerCapture(event.pointerId));
     element.addEventListener('pointermove', (event) => {
       if (event.buttons === 0) return;
-      this.yawOffset += event.movementX * 0.005;
-      this.pitch = THREE.MathUtils.clamp(this.pitch + event.movementY * 0.004, MIN_PITCH, MAX_PITCH);
+      this.rotateBy(event.movementX, event.movementY);
     });
     element.addEventListener(
       'wheel',
@@ -52,6 +51,22 @@ export class ChaseCamera {
       },
       { passive: false },
     );
+  }
+
+  /** 내려다보는 각도 (rad). 클수록 위에서 내려다본다. */
+  get viewPitch(): number {
+    return this.pitch;
+  }
+
+  /**
+   * 화면을 끈 거리만큼 시점을 돌린다. 마우스로 끌 때와 핸드폰으로 끌 때 같은 결과가 된다.
+   * - 가로로 1px 끌 때마다 배 둘레를 0.005 rad 돈다 (오른쪽으로 끌면 viewHeading이 커진다)
+   * - 세로로 1px 끌 때마다 내려다보는 각도가 0.004 rad 바뀐다 (아래로 끌면 커진다). 0.06~1.3 rad를 넘지 않는다
+   * @param dx, dy 끈 거리 (CSS px)
+   */
+  rotateBy(dx: number, dy: number): void {
+    this.yawOffset += dx * 0.005;
+    this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.004, MIN_PITCH, MAX_PITCH);
   }
 
   /** 카메라가 따라가는 침로를 즉시 맞춘다. 배의 시작 방향이 북쪽이 아닐 때 처음부터 선미 쪽에서 바라보게 한다. */
