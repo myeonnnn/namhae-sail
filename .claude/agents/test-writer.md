@@ -36,7 +36,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 - 무작위가 필요하면 `src/core/random.ts`의 `seededRandom`을 쓴다.
 - 기대값은 구현에서 복사하지 말고, 물리나 수식에서 독립적으로 구한다. 근사값은 허용 오차의 근거를 주석으로 적는다.
 - 테스트 이름과 주석은 한국어로, 무엇을 보장하는지 문장으로 쓴다. 기존 테스트 파일의 문체를 따른다.
-- 서식: `npx prettier --single-quote --print-width 120 --write <만든 파일>`
+- 서식: `pnpm exec prettier --write <만든 파일>` (옵션은 `.prettierrc.json`에 있다)
 
 ## 보고
 

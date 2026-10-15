@@ -14,10 +14,10 @@ pnpm vitest run --project integration   # 통합 테스트만
 pnpm vitest run --project browser       # WebGL이 필요한 테스트만 (설치된 Chrome을 헤드리스로 사용)
 pnpm build        # typecheck + vite build
 pnpm verify:harness [--runs 5] [--skip-faults]   # 테스트 하네스 검증: 분류, 시간 한도, 불안정, 오류 주입 (약 20초)
-npx prettier --single-quote --print-width 120 --write <파일>
+pnpm exec prettier --write <파일>   # 옵션은 .prettierrc.json에 있다
 ```
 
-- prettier 설정 파일이 없다. 옵션을 빼면 큰따옴표로 바뀌고, 폴더 전체에 실행하면 관계없는 파일까지 바뀐다. 고친 파일에만 실행한다.
+- prettier는 프로젝트에 고정한 버전(node_modules)을 쓴다. 전역에 설치된 다른 버전과 결과가 다를 수 있다.
 - 개발 서버는 상위 폴더의 `.claude/launch.json`에 `namhae-sail`로 등록되어 있다.
 
 ## 구조
