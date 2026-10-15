@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { COURSES, type Course } from '../course/course';
-import { CAPSIZE_PENALTY, COUNTDOWN_SECONDS, Race, segmentsCross } from './race';
+import { Race, segmentsCross } from './race';
 
 const DT = 1 / 60;
+// 요구사항의 값. 구현의 상수를 가져오면 상수가 틀려도 테스트가 통과하므로 여기에 따로 적는다.
+/** 출발 전 카운트다운 (초) */
+const COUNTDOWN = 3;
+/** 전복 한 번의 벌점 (초) */
+const PENALTY_PER_CAPSIZE = 10;
 
 // 북쪽(-Z)으로 곧게 놓인 연습용 코스: 100m마다 폭 40m의 관문이 두 개 있고, 두 번째가 도착선이다.
 const gateAt = (z: number, finish: boolean) => ({ x: 0, z, ax: -20, az: z, bx: 20, bz: z, heading: 0, finish });
@@ -23,7 +28,7 @@ const COURSE: Course = {
 function started(): Race {
   const race = new Race(COURSE);
   race.begin();
-  for (let t = 0; t < COUNTDOWN_SECONDS + 0.1; t += DT) race.step(DT, COURSE.start, COURSE.start);
+  for (let t = 0; t < COUNTDOWN + 0.1; t += DT) race.step(DT, COURSE.start, COURSE.start);
   return race;
 }
 
@@ -41,7 +46,7 @@ describe('타임어택의 진행', () => {
     const race = new Race(COURSE);
     race.begin();
     const events = [];
-    for (let t = 0; t < COUNTDOWN_SECONDS - 0.5; t += DT) events.push(...race.step(DT, COURSE.start, COURSE.start));
+    for (let t = 0; t < COUNTDOWN - 0.5; t += DT) events.push(...race.step(DT, COURSE.start, COURSE.start));
     expect(race.phase).toBe('countdown');
     expect(race.time).toBe(0);
     expect(events.map((e) => (e.type === 'count' ? e.remaining : e.type))).toEqual([2, 1]);
@@ -86,7 +91,7 @@ describe('타임어택의 진행', () => {
     race.step(DT, { x: 0, z: -99 }, { x: 0, z: -101 });
     race.capsize();
     expect(race.capsizes).toBe(2);
-    expect(race.total).toBeCloseTo(race.time + 2 * CAPSIZE_PENALTY, 6);
+    expect(race.total).toBeCloseTo(race.time + 2 * PENALTY_PER_CAPSIZE, 6);
     expect(race.respawn).toMatchObject({ x: 0, z: -100 });
     // 다음 관문이 정북에 있으므로 북쪽을 보고 놓인다.
     expect(race.respawn.heading).toBeCloseTo(0, 6);
