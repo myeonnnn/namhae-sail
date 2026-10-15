@@ -94,7 +94,12 @@ export function cleanHeights(heights: Float32Array, mask?: Uint8Array): void {
       highest = Math.max(highest, heights[index]);
       const x = index % size;
       const y = (index - x) / size;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const) {
         const nx = x + dx;
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;

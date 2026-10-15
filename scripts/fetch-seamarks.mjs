@@ -52,7 +52,9 @@ for (const { lat, lon, tags = {} } of elements) {
     lon: Number(lon.toFixed(6)),
     colour: primaryColour(type ? tags[`seamark:${type}:colour`] : undefined),
     // 등화의 색상과 주기. 섹터등은 "seamark:light:1:colour"처럼 번호가 붙으므로 접미사로 찾는다.
-    light: primaryColour(tags['seamark:light:colour'] ?? tagWithPrefix(tags, ':colour:light') ?? tags['seamark:light:1:colour']),
+    light: primaryColour(
+      tags['seamark:light:colour'] ?? tagWithPrefix(tags, ':colour:light') ?? tags['seamark:light:1:colour'],
+    ),
     period: Number(tags['seamark:light:period'] ?? tags['seamark:light:1:period']) || undefined,
     height: Number(tags['seamark:light:height'] ?? tags['height']) || undefined,
     name: tags['seamark:name'] ?? tags['name'],

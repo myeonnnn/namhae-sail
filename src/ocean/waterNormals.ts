@@ -26,7 +26,7 @@ export function createWaterNormals(): THREE.DataTexture {
       let slopeX = 0;
       let slopeY = 0;
       for (const wave of waves) {
-        const slope = wave.amplitude * Math.cos(twoPi * (wave.kx * x + wave.ky * y) / SIZE + wave.phase);
+        const slope = wave.amplitude * Math.cos((twoPi * (wave.kx * x + wave.ky * y)) / SIZE + wave.phase);
         slopeX += slope * wave.kx;
         slopeY += slope * wave.ky;
       }

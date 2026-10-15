@@ -219,5 +219,7 @@ console.log(`지명 ${uniquePlaces.length}개`, kinds);
 console.log(`방파제와 부두 ${structures.length}개, 시가지 ${urban.length}개`);
 console.log(`다리의 조각 ${bridgeWays.length}개 → 바다를 건너는 다리 ${bridges.length}개 → ${OUT}`);
 for (const { name, length, waterSpan, structure, width } of bridges) {
-  console.log(`  ${name ?? '(이름 없음)'}: 길이 ${length}m, 물 위 ${waterSpan}m, 폭 ${width}m${structure ? `, ${structure}` : ''}`);
+  console.log(
+    `  ${name ?? '(이름 없음)'}: 길이 ${length}m, 물 위 ${waterSpan}m, 폭 ${width}m${structure ? `, ${structure}` : ''}`,
+  );
 }

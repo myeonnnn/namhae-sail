@@ -206,7 +206,10 @@ export class Seamarks {
       body.setColorAt(index, this.colour.setHex(bodyColour(mark)));
 
       if (mark.light && isLampOn(mark, elapsed)) {
-        this.position.copy(UP).multiplyScalar(lampHeight * size).applyQuaternion(this.quaternion);
+        this.position
+          .copy(UP)
+          .multiplyScalar(lampHeight * size)
+          .applyQuaternion(this.quaternion);
         this.position.x += mark.x;
         this.position.y += baseY;
         this.position.z += mark.z;

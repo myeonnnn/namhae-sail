@@ -155,7 +155,14 @@ const gelcoat = (name, color, roughness = 0.3) =>
 
 const MATERIALS = {
   white: gelcoat('gelcoat-white', 0xf4f4f1),
-  black: new THREE.MeshPhysicalMaterial({ name: 'hull-navy', color: 0x070b14, roughness: 0.1, ior: 2.0, clearcoat: 1, clearcoatRoughness: 0.03 }),
+  black: new THREE.MeshPhysicalMaterial({
+    name: 'hull-navy',
+    color: 0x070b14,
+    roughness: 0.1,
+    ior: 2.0,
+    clearcoat: 1,
+    clearcoatRoughness: 0.03,
+  }),
   antifoul: new THREE.MeshStandardMaterial({ name: 'antifoul', color: 0x121c2e, roughness: 0.85 }),
   deck: new THREE.MeshStandardMaterial({ name: 'deck-nonskid', color: 0xdcddd8, roughness: 0.95 }),
   glass: new THREE.MeshPhysicalMaterial({ name: 'glass-tinted', color: 0x05080b, roughness: 0.03, ior: 2.0 }),
@@ -164,9 +171,24 @@ const MATERIALS = {
   steel: new THREE.MeshStandardMaterial({ name: 'stainless', color: 0xb4bac0, roughness: 0.22, metalness: 0.92 }),
   rubber: new THREE.MeshStandardMaterial({ name: 'rubber', color: 0x0d0d0e, roughness: 0.9 }),
   plastic: new THREE.MeshStandardMaterial({ name: 'plastic-white', color: 0xeeeeec, roughness: 0.5 }),
-  lampWhite: new THREE.MeshStandardMaterial({ name: 'lamp-white', color: 0xffffff, emissive: 0xfff4d6, emissiveIntensity: 0.6 }),
-  lampRed: new THREE.MeshStandardMaterial({ name: 'lamp-port', color: 0xd01818, emissive: 0xff1a10, emissiveIntensity: 0.8 }),
-  lampGreen: new THREE.MeshStandardMaterial({ name: 'lamp-starboard', color: 0x12a548, emissive: 0x10ff60, emissiveIntensity: 0.8 }),
+  lampWhite: new THREE.MeshStandardMaterial({
+    name: 'lamp-white',
+    color: 0xffffff,
+    emissive: 0xfff4d6,
+    emissiveIntensity: 0.6,
+  }),
+  lampRed: new THREE.MeshStandardMaterial({
+    name: 'lamp-port',
+    color: 0xd01818,
+    emissive: 0xff1a10,
+    emissiveIntensity: 0.8,
+  }),
+  lampGreen: new THREE.MeshStandardMaterial({
+    name: 'lamp-starboard',
+    color: 0x12a548,
+    emissive: 0x10ff60,
+    emissiveIntensity: 0.8,
+  }),
 };
 
 // ---- 재질별로 삼각형을 모으는 버킷 ----
@@ -220,7 +242,12 @@ function emit(spec, points, normals, mirror) {
     const part = Number.isFinite(limit) ? clipPolygon(rest, limit, true) : rest;
     for (let k = 1; k < part.length - 1; k++) {
       const tri = [part[0], part[k], part[k + 1]];
-      pushTriangle(key, tri.map((v) => v.p), tri.map((v) => v.n), mirror);
+      pushTriangle(
+        key,
+        tri.map((v) => v.p),
+        tri.map((v) => v.n),
+        mirror,
+      );
     }
     if (!Number.isFinite(limit)) return;
     rest = clipPolygon(rest, limit, false);
@@ -273,9 +300,7 @@ function loft({ stations, rows, point, mat, outward, normal, flat = false, mirro
   normals = normals.map((n, index) => (mirror && Math.abs(grid[index][0]) < 1e-4 ? unit([0, n[1], n[2]]) : n));
 
   for (let f = 0; f < indices.length; f += 3) {
-    const tri = flip
-      ? [indices[f], indices[f + 2], indices[f + 1]]
-      : [indices[f], indices[f + 1], indices[f + 2]];
+    const tri = flip ? [indices[f], indices[f + 2], indices[f + 1]] : [indices[f], indices[f + 1], indices[f + 2]];
     const points = tri.map((n) => grid[n]);
     let triNormals = tri.map((n) => normals[n]);
     if (flat) {
@@ -312,7 +337,8 @@ function addShape(key, geometry, matrix, { mirror = false } = {}) {
   const pos = g.getAttribute('position');
   const nor = g.getAttribute('normal');
   for (let f = 0; f < pos.count; f += 3) {
-    const read = (attribute) => [0, 1, 2].map((k) => [attribute.getX(f + k), attribute.getY(f + k), attribute.getZ(f + k)]);
+    const read = (attribute) =>
+      [0, 1, 2].map((k) => [attribute.getX(f + k), attribute.getY(f + k), attribute.getZ(f + k)]);
     pushTriangle(key, read(pos), read(nor), mirror);
   }
 }
@@ -324,7 +350,8 @@ const place = (x, y, z, { rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1 } = {})
     new THREE.Vector3(sx, sy, sz),
   );
 
-const box = (key, w, h, d, x, y, z, options) => addShape(key, new THREE.BoxGeometry(w, h, d), place(x, y, z, options), options);
+const box = (key, w, h, d, x, y, z, options) =>
+  addShape(key, new THREE.BoxGeometry(w, h, d), place(x, y, z, options), options);
 const roundBox = (key, w, h, d, radius, x, y, z, options) =>
   addShape(key, new RoundedBoxGeometry(w, h, d, 3, radius), place(x, y, z, options), options);
 
@@ -418,7 +445,12 @@ const hullRef = () => [1, 0, 0];
 
 const HULL_STATIONS = 81;
 const tHull = (i) => i / (HULL_STATIONS - 1);
-const painted = (above) => ({ bands: [[PAINT_LINE, 'antifoul'], [Infinity, above]] });
+const painted = (above) => ({
+  bands: [
+    [PAINT_LINE, 'antifoul'],
+    [Infinity, above],
+  ],
+});
 
 loft({
   stations: HULL_STATIONS,
@@ -449,7 +481,14 @@ const transomSection = [
 ];
 const transomBand = BLACK_BAND.map((u) => topsidePoint(0, u)[1]);
 capFan(
-  { bands: [[PAINT_LINE, 'antifoul'], [transomBand[0], 'white'], [transomBand[1], 'black'], [Infinity, 'white']] },
+  {
+    bands: [
+      [PAINT_LINE, 'antifoul'],
+      [transomBand[0], 'white'],
+      [transomBand[1], 'black'],
+      [Infinity, 'white'],
+    ],
+  },
   [0, 1.0, zAt(0)],
   transomSection,
   [0, 0, 1],
@@ -553,7 +592,10 @@ const ROOF_KEYS = [
 ];
 const roofLinear = (t) => {
   const tc = Math.min(Math.max(t, ROOF_KEYS[0][0]), ROOF_KEYS.at(-1)[0]);
-  const k = Math.max(1, ROOF_KEYS.findIndex(([key]) => key >= tc));
+  const k = Math.max(
+    1,
+    ROOF_KEYS.findIndex(([key]) => key >= tc),
+  );
   const [t0, r0] = ROOF_KEYS[k - 1];
   const [t1, r1] = ROOF_KEYS[k];
   return lerp(r0, r1, (tc - t0) / (t1 - t0));
@@ -614,7 +656,14 @@ const zBulkhead = zAt(CABIN_AFT);
   const section = Array.from({ length: CABIN_ROWS }, (_, j) => housePoint(CABIN_AFT, j / (CABIN_ROWS - 1)));
   capFan('white', [0, houseBaseY(CABIN_AFT) + 0.8, zBulkhead], section, [0, 0, 1]);
   const top = houseBaseY(CABIN_AFT) + 0.02;
-  addQuad('white', [-WELL_HALF_WIDTH, FLOOR_Y, zBulkhead], [WELL_HALF_WIDTH, FLOOR_Y, zBulkhead], [WELL_HALF_WIDTH, top, zBulkhead], [-WELL_HALF_WIDTH, top, zBulkhead], [0, 0, 1]);
+  addQuad(
+    'white',
+    [-WELL_HALF_WIDTH, FLOOR_Y, zBulkhead],
+    [WELL_HALF_WIDTH, FLOOR_Y, zBulkhead],
+    [WELL_HALF_WIDTH, top, zBulkhead],
+    [-WELL_HALF_WIDTH, top, zBulkhead],
+    [0, 0, 1],
+  );
 
   const doorHeight = 1.66;
   const doorY = FLOOR_Y + 0.05 + doorHeight / 2;
@@ -647,7 +696,15 @@ const zBulkhead = zAt(CABIN_AFT);
     outward: (p, _, j) => (j <= NV ? [p[0], p[1] - 1.5, 0] : [0, 0, 0]),
   });
   for (let j = 0; j < NV; j++) {
-    addQuad('white', shellPoint(0, j), shellPoint(0, j + 1), shellPoint(0, 2 * NV - j), shellPoint(0, 2 * NV + 1 - j), [0, 0, 1], true);
+    addQuad(
+      'white',
+      shellPoint(0, j),
+      shellPoint(0, j + 1),
+      shellPoint(0, 2 * NV - j),
+      shellPoint(0, 2 * NV + 1 - j),
+      [0, 0, 1],
+      true,
+    );
   }
 }
 
@@ -664,7 +721,9 @@ const glazing = [
   {
     t0: 0.238,
     t1: 0.341,
-    lo: (t) => lerp(0.455, BELT, smooth(clamp01((t - 0.238) / 0.075))) + roundedBand(0.238, 0.341, 0, 1, 0.012, 0.04).lo(t) * (t > 0.3 ? 1 : 0),
+    lo: (t) =>
+      lerp(0.455, BELT, smooth(clamp01((t - 0.238) / 0.075))) +
+      roundedBand(0.238, 0.341, 0, 1, 0.012, 0.04).lo(t) * (t > 0.3 ? 1 : 0),
     hi: (t) => 0.47 - roundedBand(0.238, 0.341, 0, 1, 0.012, 0.04).lo(t) * (t > 0.3 ? 1 : 0),
     nt: 26,
     nv: 8,
@@ -680,8 +739,22 @@ for (const [t0, t1, v0] of [
   [0.652, 0.69, 0.86],
   [0.735, 0.768, 0.8],
 ]) {
-  patch({ key: 'steel', ...houseSurface, ...roundedBand(t0 - 0.004, t1 + 0.004, v0 - 0.02, 1, 0.008, 0.03, { roundHi: false }), offset: 0.008, nt: 16, nv: 6 });
-  patch({ key: 'glass', ...houseSurface, ...roundedBand(t0, t1, v0, 1, 0.006, 0.025, { roundHi: false }), offset: 0.016, nt: 16, nv: 6 });
+  patch({
+    key: 'steel',
+    ...houseSurface,
+    ...roundedBand(t0 - 0.004, t1 + 0.004, v0 - 0.02, 1, 0.008, 0.03, { roundHi: false }),
+    offset: 0.008,
+    nt: 16,
+    nv: 6,
+  });
+  patch({
+    key: 'glass',
+    ...houseSurface,
+    ...roundedBand(t0, t1, v0, 1, 0.006, 0.025, { roundHi: false }),
+    offset: 0.016,
+    nt: 16,
+    nv: 6,
+  });
 }
 
 // 와이퍼
@@ -696,7 +769,8 @@ addRod('rubber', onHouse(0.582, 0.72, 0.03), onHouse(0.512, 0.63, 0.03), 0.009, 
     points.push(onHouse(lerp(0.615, 0.775, k / 16), 0.52, lift - 0.01));
   }
   addTube('steel', points, 0.014, { mirror: true });
-  for (const t of [0.668, 0.722]) addRod('steel', onHouse(t, 0.52, 0), onHouse(t, 0.52, 0.1), 0.01, 0.01, { mirror: true });
+  for (const t of [0.668, 0.722])
+    addRod('steel', onHouse(t, 0.52, 0), onHouse(t, 0.52, 0.1), 0.01, 0.01, { mirror: true });
 }
 
 // 항해등 (우현은 녹색, 좌현은 적색)
@@ -716,7 +790,11 @@ addRod('rubber', onHouse(0.582, 0.72, 0.03), onHouse(0.512, 0.63, 0.03), 0.009, 
   const p = housePoint(0.425, 1);
   addShape('steel', new THREE.CylinderGeometry(0.02, 0.025, 0.1, 10), place(0, p[1] + 0.04, p[2]));
   addShape('steel', new THREE.CylinderGeometry(0.07, 0.06, 0.13, 16), place(0, p[1] + 0.13, p[2], { rx: Math.PI / 2 }));
-  addShape('lampWhite', new THREE.CylinderGeometry(0.058, 0.058, 0.01, 16), place(0, p[1] + 0.13, p[2] - 0.066, { rx: Math.PI / 2 }));
+  addShape(
+    'lampWhite',
+    new THREE.CylinderGeometry(0.058, 0.058, 0.01, 16),
+    place(0, p[1] + 0.13, p[2] - 0.066, { rx: Math.PI / 2 }),
+  );
 }
 
 // 레이더 아치
@@ -795,8 +873,23 @@ const zWellAft = zAt(COCKPIT_AFT);
   const deckLevel = houseBaseY(COCKPIT_AFT) + 0.02;
   const w = WELL_HALF_WIDTH;
   const coamingTop = houseBaseY(COCKPIT_AFT) + coaming(COCKPIT_AFT);
-  addQuad('white', [w, deckLevel - 0.05, zWellAft], [HOUSE_WIDTH - 0.02, deckLevel - 0.05, zWellAft], [HOUSE_WIDTH - 0.02, coamingTop, zWellAft], [w, coamingTop, zWellAft], [0, 0, 1], true);
-  addQuad('white', [-w, FLOOR_Y, zWellAft], [w, FLOOR_Y, zWellAft], [w, deckLevel, zWellAft], [-w, deckLevel, zWellAft], [0, 0, -1]);
+  addQuad(
+    'white',
+    [w, deckLevel - 0.05, zWellAft],
+    [HOUSE_WIDTH - 0.02, deckLevel - 0.05, zWellAft],
+    [HOUSE_WIDTH - 0.02, coamingTop, zWellAft],
+    [w, coamingTop, zWellAft],
+    [0, 0, 1],
+    true,
+  );
+  addQuad(
+    'white',
+    [-w, FLOOR_Y, zWellAft],
+    [w, FLOOR_Y, zWellAft],
+    [w, deckLevel, zWellAft],
+    [-w, deckLevel, zWellAft],
+    [0, 0, -1],
+  );
 
   // 뒤쪽 벤치: 받침, 방석, 등받이
   const benchLeft = -w;
@@ -827,7 +920,11 @@ const zWellAft = zAt(COCKPIT_AFT);
   // 우현 앞쪽의 웨트 바
   roundBox('white', 0.55, 0.88, 0.92, 0.03, w - 0.275, FLOOR_Y + 0.44, zBulkhead + 0.5);
   box('black', 0.57, 0.025, 0.94, w - 0.275, FLOOR_Y + 0.89, zBulkhead + 0.5);
-  addShape('steel', new THREE.CylinderGeometry(0.11, 0.11, 0.012, 18), place(w - 0.28, FLOOR_Y + 0.905, zBulkhead + 0.32));
+  addShape(
+    'steel',
+    new THREE.CylinderGeometry(0.11, 0.11, 0.012, 18),
+    place(w - 0.28, FLOOR_Y + 0.905, zBulkhead + 0.32),
+  );
 
   // 우현 뒤쪽의 계단
   box('white', w - 0.56, 0.19, 0.27, (w + 0.56) / 2, FLOOR_Y + 0.095, zWellAft - 0.135);
@@ -838,7 +935,16 @@ const zWellAft = zAt(COCKPIT_AFT);
   const padLength = zAt(0) - 0.12 - (zWellAft + 0.2);
   box('white', benchWidth, 0.07, padLength + 0.04, benchX, deckLevel + 0.03, padZ);
   for (const side of [-1, 1]) {
-    roundBox('cream', benchWidth / 2 - 0.02, 0.12, padLength, 0.05, benchX + (side * benchWidth) / 4, deckLevel + 0.12, padZ);
+    roundBox(
+      'cream',
+      benchWidth / 2 - 0.02,
+      0.12,
+      padLength,
+      0.05,
+      benchX + (side * benchWidth) / 4,
+      deckLevel + 0.12,
+      padZ,
+    );
   }
 }
 
@@ -882,8 +988,16 @@ const zWellAft = zAt(COCKPIT_AFT);
   const top = DRAFT + 0.24;
   const zBase = zAt(0) - 0.05;
   // 도형의 y축을 선체의 z축으로, 돌출 방향을 아래쪽으로 돌린다.
-  addShape('white', new THREE.ExtrudeGeometry(outline(0), { depth: 0.11, bevelEnabled: false, curveSegments: 10 }), place(0, top, zBase, { rx: Math.PI / 2 }));
-  addShape('teak', new THREE.ExtrudeGeometry(outline(0.07), { depth: 0.012, bevelEnabled: false, curveSegments: 10 }), place(0, top + 0.012, zBase, { rx: Math.PI / 2 }));
+  addShape(
+    'white',
+    new THREE.ExtrudeGeometry(outline(0), { depth: 0.11, bevelEnabled: false, curveSegments: 10 }),
+    place(0, top, zBase, { rx: Math.PI / 2 }),
+  );
+  addShape(
+    'teak',
+    new THREE.ExtrudeGeometry(outline(0.07), { depth: 0.012, bevelEnabled: false, curveSegments: 10 }),
+    place(0, top + 0.012, zBase, { rx: Math.PI / 2 }),
+  );
 
   // 트림 탭과 선미등
   const deadrise = Math.atan2(chineY(0), chineX(0));
@@ -914,7 +1028,11 @@ const zWellAft = zAt(COCKPIT_AFT);
   const railPoint = (t, side, fraction) => {
     const rise = smooth(clamp01((t - T0) / 0.06));
     const height = rise * lerp(0.64, 0.74, (t - T0) / (T1 - T0));
-    return [side * (railX(t) - 0.04 * fraction), sheerY(t) - 0.07 + fraction * height + (fraction > 0 ? 0.02 : 0), zAt(t)];
+    return [
+      side * (railX(t) - 0.04 * fraction),
+      sheerY(t) - 0.07 + fraction * height + (fraction > 0 ? 0.02 : 0),
+      zAt(t),
+    ];
   };
   const loop = (tFrom, fraction, samples) => {
     const points = [];
@@ -928,7 +1046,9 @@ const zWellAft = zAt(COCKPIT_AFT);
   addTube('steel', loop(0.415, 0.5, 36), 0.011, { segments: 300 });
   for (const t of [0.415, 0.49, 0.565, 0.64, 0.715, 0.79, 0.865, 0.935, 0.985]) {
     addRod('steel', railPoint(t, 1, 0), railPoint(t, 1, 1), 0.013, 0.013, { mirror: true });
-    addShape('steel', new THREE.CylinderGeometry(0.028, 0.032, 0.015, 10), place(...railPoint(t, 1, 0)), { mirror: true });
+    addShape('steel', new THREE.CylinderGeometry(0.028, 0.032, 0.015, 10), place(...railPoint(t, 1, 0)), {
+      mirror: true,
+    });
   }
 
   // 클리트
@@ -936,9 +1056,13 @@ const zWellAft = zAt(COCKPIT_AFT);
     const x = sheerX(t) - inset;
     const y = deckY(t, x);
     const z = zAt(t);
-    addShape('steel', new THREE.CapsuleGeometry(0.014, 0.2, 4, 10), place(x, y + 0.055, z, { rx: Math.PI / 2 }), { mirror: true });
+    addShape('steel', new THREE.CapsuleGeometry(0.014, 0.2, 4, 10), place(x, y + 0.055, z, { rx: Math.PI / 2 }), {
+      mirror: true,
+    });
     for (const dz of [-0.045, 0.045]) {
-      addShape('steel', new THREE.CylinderGeometry(0.012, 0.016, 0.05, 8), place(x, y + 0.028, z + dz), { mirror: true });
+      addShape('steel', new THREE.CylinderGeometry(0.012, 0.016, 0.05, 8), place(x, y + 0.028, z + dz), {
+        mirror: true,
+      });
     }
   };
   cleat(0.9, 0.19);
@@ -952,7 +1076,11 @@ const zWellAft = zAt(COCKPIT_AFT);
   const windlassY = deckY(windlassT, 0);
   addShape('steel', new THREE.CylinderGeometry(0.075, 0.09, 0.12, 18), place(0, windlassY + 0.06, zAt(windlassT)));
   addShape('steel', new THREE.SphereGeometry(0.075, 16, 10), place(0, windlassY + 0.12, zAt(windlassT), { sy: 0.4 }));
-  addShape('steel', new THREE.CylinderGeometry(0.055, 0.055, 0.07, 14), place(0.11, windlassY + 0.07, zAt(windlassT), { rz: Math.PI / 2 }));
+  addShape(
+    'steel',
+    new THREE.CylinderGeometry(0.055, 0.055, 0.07, 14),
+    place(0.11, windlassY + 0.07, zAt(windlassT), { rz: Math.PI / 2 }),
+  );
 
   const bowY = sheerY(1);
   const zBow = zAt(1);
@@ -993,5 +1121,7 @@ const bounds = new THREE.Box3().setFromObject(yacht);
 const size = bounds.getSize(new THREE.Vector3());
 console.log(OUT);
 console.log(`size  ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)} m (beam x height x length)`);
-console.log(`z     ${bounds.min.z.toFixed(2)} (bow) .. ${bounds.max.z.toFixed(2)} (stern), y ${bounds.min.y.toFixed(2)} .. ${bounds.max.y.toFixed(2)}, draft ${DRAFT} m`);
+console.log(
+  `z     ${bounds.min.z.toFixed(2)} (bow) .. ${bounds.max.z.toFixed(2)} (stern), y ${bounds.min.y.toFixed(2)} .. ${bounds.max.y.toFixed(2)}, draft ${DRAFT} m`,
+);
 console.log(`tris  ${triangles}, ${(glb.byteLength / 1024).toFixed(0)} KB`);

@@ -44,7 +44,11 @@ export class ChaseCamera {
       'wheel',
       (event) => {
         event.preventDefault();
-        this.distance = THREE.MathUtils.clamp(this.distance * Math.exp(event.deltaY * 0.001), this.minDistance, this.maxDistance);
+        this.distance = THREE.MathUtils.clamp(
+          this.distance * Math.exp(event.deltaY * 0.001),
+          this.minDistance,
+          this.maxDistance,
+        );
       },
       { passive: false },
     );
@@ -102,7 +106,8 @@ export class ChaseCamera {
     if (this.shakeRemaining > 0) {
       this.shakeRemaining -= dt;
       // 흔들림의 폭은 카메라와 배 사이의 거리에 비례해야 화면에서 같은 크기로 보인다. 시간이 지나면서 빠르게 잦아든다.
-      const amplitude = this.distance * 0.02 * this.shakeStrength * (Math.max(this.shakeRemaining, 0) / SHAKE_DURATION) ** 2;
+      const amplitude =
+        this.distance * 0.02 * this.shakeStrength * (Math.max(this.shakeRemaining, 0) / SHAKE_DURATION) ** 2;
       this.camera.position.x += (Math.random() - 0.5) * amplitude;
       this.camera.position.y += (Math.random() - 0.5) * amplitude;
       this.camera.position.z += (Math.random() - 0.5) * amplitude;

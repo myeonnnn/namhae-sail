@@ -27,7 +27,8 @@ describe('횡동요', () => {
   it('고유 주기와 같은 주기의 파도를 만나면 수면의 기울기보다 훨씬 크게 기울어진다', () => {
     const slope = 0.05;
     const wave = (period: number) => (time: number) => slope * Math.sin((Math.PI * 2 * time) / period);
-    const peak = (period: number) => Math.max(...simulate(40, wave(period), { angle: 0, rate: 0 }).slice(-600).map(Math.abs));
+    const peak = (period: number) =>
+      Math.max(...simulate(40, wave(period), { angle: 0, rate: 0 }).slice(-600).map(Math.abs));
     expect(peak(PARAMS.period)).toBeGreaterThan(slope * 3);
     // 주기가 긴 너울은 선체가 그대로 따라가고, 주기가 짧은 잔물결에는 거의 반응하지 않는다.
     expect(peak(PARAMS.period * 5)).toBeCloseTo(slope, 1);
@@ -36,7 +37,8 @@ describe('횡동요', () => {
 
   it('달리고 있으면 같은 파도에서도 덜 흔들린다', () => {
     const wave = (time: number) => 0.05 * Math.sin((Math.PI * 2 * time) / PARAMS.period);
-    const peak = (speed: number) => Math.max(...simulate(40, wave, { angle: 0, rate: 0 }, speed).slice(-600).map(Math.abs));
+    const peak = (speed: number) =>
+      Math.max(...simulate(40, wave, { angle: 0, rate: 0 }, speed).slice(-600).map(Math.abs));
     expect(peak(15)).toBeLessThan(peak(0) * 0.6);
   });
 

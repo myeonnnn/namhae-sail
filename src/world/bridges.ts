@@ -164,7 +164,10 @@ export class Bridges {
       }
     }
 
-    for (const [geometries, colour] of [[decks, DECK_COLOUR], [supports, PIER_COLOUR]] as const) {
+    for (const [geometries, colour] of [
+      [decks, DECK_COLOUR],
+      [supports, PIER_COLOUR],
+    ] as const) {
       const merged = geometries.length ? mergeGeometries(geometries) : null;
       geometries.forEach((geometry) => geometry.dispose());
       if (!merged) continue;
@@ -221,7 +224,8 @@ function createDeck(profile: Station[], halfWidth: number, anchor: { x: number; 
     ];
   });
 
-  const quad = (a: number[], b: number[], c: number[], d: number[]) => positions.push(...a, ...b, ...c, ...a, ...c, ...d);
+  const quad = (a: number[], b: number[], c: number[], d: number[]) =>
+    positions.push(...a, ...b, ...c, ...a, ...c, ...d);
   for (let i = 0; i < corners.length - 1; i++) {
     const current = corners[i];
     const next = corners[i + 1];

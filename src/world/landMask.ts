@@ -75,7 +75,8 @@ export class LandMask {
     context.beginPath();
     for (const polygon of this.polygons) {
       // 이 타일과 겹치지 않는 폴리곤은 건너뛴다.
-      if (polygon.maxX < tileX || polygon.minX > tileX + 1 || polygon.maxY < tileY || polygon.minY > tileY + 1) continue;
+      if (polygon.maxX < tileX || polygon.minX > tileX + 1 || polygon.maxY < tileY || polygon.minY > tileY + 1)
+        continue;
       const { points } = polygon;
       context.moveTo((points[0] - tileX) * tilePixels, (points[1] - tileY) * tilePixels);
       for (let i = 2; i < points.length; i += 2) {

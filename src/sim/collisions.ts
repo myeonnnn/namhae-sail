@@ -28,7 +28,12 @@ type PointTest = (x: number, z: number) => boolean;
  *
  * @param time 시뮬레이션의 경과 시간 (초). 부표가 밀려났다가 돌아오는 움직임의 기준이 된다.
  */
-export function resolveCollisions(ship: Ship, spec: ShipSpec, world: CollisionWorld, time: number): Collision | undefined {
+export function resolveCollisions(
+  ship: Ship,
+  spec: ShipSpec,
+  world: CollisionWorld,
+  time: number,
+): Collision | undefined {
   const { terrain, structures, bridges, seamarks } = world;
   const { state } = ship;
 

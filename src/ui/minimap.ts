@@ -134,7 +134,12 @@ export class Minimap {
     this.shipFeature.setStyle(new Style({ image: this.shipIcon }));
     this.focusFeature.setStyle(
       new Style({
-        image: new RegularShape({ points: 4, radius: 9, radius2: 0, stroke: new Stroke({ color: '#1b2733', width: 2 }) }),
+        image: new RegularShape({
+          points: 4,
+          radius: 9,
+          radius2: 0,
+          stroke: new Stroke({ color: '#1b2733', width: 2 }),
+        }),
       }),
     );
 
@@ -167,7 +172,15 @@ export class Minimap {
     // 운영 구역의 경계. 이 선의 바깥으로는 항해할 수 없다.
     const { south, west, north, east } = REGION.bounds;
     const boundary = new Feature(
-      new Polygon([ring([[west, south], [east, south], [east, north], [west, north], [west, south]])]),
+      new Polygon([
+        ring([
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+          [west, south],
+        ]),
+      ]),
     );
 
     new OlMap({
@@ -180,7 +193,10 @@ export class Minimap {
         new VectorLayer({
           source: structures,
           maxResolution: 60,
-          style: new Style({ fill: new Fill({ color: '#6f6a60' }), stroke: new Stroke({ color: '#6f6a60', width: 2 }) }),
+          style: new Style({
+            fill: new Fill({ color: '#6f6a60' }),
+            stroke: new Stroke({ color: '#6f6a60', width: 2 }),
+          }),
         }),
         new VectorLayer({
           source: bridges,
@@ -200,7 +216,10 @@ export class Minimap {
           source: marks,
           style: (feature, resolution) => this.markStyle(feature.get('record') as SeamarkRecord, resolution),
         }),
-        new VectorLayer({ source: this.course, style: (feature) => this.courseStyle(feature.get('gate') as number | undefined) }),
+        new VectorLayer({
+          source: this.course,
+          style: (feature) => this.courseStyle(feature.get('gate') as number | undefined),
+        }),
         new VectorLayer({
           source: places,
           style: (feature, resolution) => this.placeStyle(feature.get('place') as ChartPlace, resolution),

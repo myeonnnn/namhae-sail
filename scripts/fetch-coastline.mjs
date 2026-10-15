@@ -153,7 +153,11 @@ polygons.sort((a, b) => b.length - a.length);
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(
   OUT,
-  JSON.stringify({ type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: polygons.map((ring) => [ring]) } }),
+  JSON.stringify({
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'MultiPolygon', coordinates: polygons.map((ring) => [ring]) },
+  }),
 );
 
 const keptPoints = polygons.reduce((sum, ring) => sum + ring.length, 0);

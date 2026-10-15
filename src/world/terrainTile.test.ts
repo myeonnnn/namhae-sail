@@ -9,7 +9,8 @@ describe('cleanHeights', () => {
     const heights = sea();
     // 완만한 언덕: 가운데가 120m이고 한 픽셀마다 4m씩 낮아진다.
     for (let y = 60; y <= 140; y++) {
-      for (let x = 60; x <= 140; x++) heights[at(x, y)] = Math.max(2, 120 - 4 * Math.max(Math.abs(x - 100), Math.abs(y - 100)));
+      for (let x = 60; x <= 140; x++)
+        heights[at(x, y)] = Math.max(2, 120 - 4 * Math.max(Math.abs(x - 100), Math.abs(y - 100)));
     }
     heights[at(100, 100)] = 120;
     heights[at(70, 70)] = 900;

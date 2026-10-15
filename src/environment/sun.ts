@@ -70,7 +70,7 @@ export function sunPosition({ hour, dayOfYear }: TimeOfDay, { lat, lon }: LatLon
     y: up,
     z: -north,
     elevationDeg: Math.asin(up) / DEG,
-    azimuthDeg: ((Math.atan2(east, north) / DEG) + 360) % 360,
+    azimuthDeg: (Math.atan2(east, north) / DEG + 360) % 360,
   };
 }
 

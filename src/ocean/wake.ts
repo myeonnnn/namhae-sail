@@ -136,7 +136,10 @@ export class Wake {
     if (!newest || Math.hypot(ship.x - newest.x, ship.z - newest.z) >= this.pointSpacing) {
       trail.unshift({ x: ship.x, z: ship.z, heading: ship.heading, speed: Math.abs(ship.surge), time: elapsed });
     }
-    while (trail.length > MAX_POINTS - 1 || (trail.length > 0 && elapsed - trail[trail.length - 1].time > this.wakeLife * 2.7)) {
+    while (
+      trail.length > MAX_POINTS - 1 ||
+      (trail.length > 0 && elapsed - trail[trail.length - 1].time > this.wakeLife * 2.7)
+    ) {
       trail.pop();
     }
   }

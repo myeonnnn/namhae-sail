@@ -45,7 +45,8 @@ export class StartScreen {
     title.append(logo, 'Namhae Sail');
     const summary = document.createElement('p');
     summary.className = 'start-summary';
-    summary.textContent = '통영과 거제 사이의 한려수도를 요트로 항해합니다. 지형과 해도, 바람과 파도, 태양의 위치는 실제 자료와 물리 수식으로 계산합니다.';
+    summary.textContent =
+      '통영과 거제 사이의 한려수도를 요트로 항해합니다. 지형과 해도, 바람과 파도, 태양의 위치는 실제 자료와 물리 수식으로 계산합니다.';
 
     card.append(title, summary);
 
@@ -53,7 +54,8 @@ export class StartScreen {
     if (window.matchMedia('(pointer: coarse) and (hover: none)').matches) {
       const notice = document.createElement('p');
       notice.className = 'start-notice';
-      notice.textContent = '이 시뮬레이터는 키보드로 조종합니다. 휴대전화나 태블릿에서는 둘러보기만 가능하며, 데스크톱에서 여는 것을 권장합니다.';
+      notice.textContent =
+        '이 시뮬레이터는 키보드로 조종합니다. 휴대전화나 태블릿에서는 둘러보기만 가능하며, 데스크톱에서 여는 것을 권장합니다.';
       card.append(notice);
     }
 

@@ -62,7 +62,8 @@ export class Radar {
     this.element.className = 'hud-radar';
     this.element.title = '휠을 돌리면 탐지 거리가 바뀝니다';
     // 개발 서버에서 주소에 ?radarTruth를 붙이면, 실제로 장애물이 있는 곳을 붉은색으로 깔아서 영상과 비교할 수 있다.
-    this.truth = import.meta.env.DEV && new URLSearchParams(location.search).has('radarTruth') ? this.createLayer() : null;
+    this.truth =
+      import.meta.env.DEV && new URLSearchParams(location.search).has('radarTruth') ? this.createLayer() : null;
     this.echoes = this.createLayer();
     this.overlay = this.createLayer();
 

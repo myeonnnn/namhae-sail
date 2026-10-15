@@ -66,7 +66,13 @@ export class Structures {
    * 방파제 끝의 등대는 좌표가 방파제의 윤곽에서 몇 미터 벗어나 있는 경우가 많아서, 가까운 구조물 위에 올려놓는 데 사용한다.
    */
   topNear(x: number, z: number, radius: number): number | undefined {
-    for (const [dx, dz] of [[0, 0], [radius, 0], [-radius, 0], [0, radius], [0, -radius]] as const) {
+    for (const [dx, dz] of [
+      [0, 0],
+      [radius, 0],
+      [-radius, 0],
+      [0, radius],
+      [0, -radius],
+    ] as const) {
       const top = this.topAt(x + dx, z + dz);
       if (top !== undefined) return top;
     }

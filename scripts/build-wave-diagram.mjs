@@ -24,7 +24,12 @@ const TRACKED = 14;
 
 const ROWS = [
   { y: 100, horizontal: 0, title: '위아래로만 움직일 때', note: 'y += 진폭 × sin(위상)' },
-  { y: 270, horizontal: STEEPNESS, title: '좌우로도 움직일 때 (Gerstner 파도)', note: 'x += 뾰족한 정도 × 진폭 × cos(위상)' },
+  {
+    y: 270,
+    horizontal: STEEPNESS,
+    title: '좌우로도 움직일 때 (Gerstner 파도)',
+    note: 'x += 뾰족한 정도 × 진폭 × cos(위상)',
+  },
 ];
 
 const k = (Math.PI * 2) / WAVELENGTH;
@@ -48,7 +53,9 @@ for (const row of ROWS) {
   parts.push(`<line class="rest" x1="${LEFT - 20}" y1="${row.y}" x2="${RIGHT + 20}" y2="${row.y}"/>`);
 
   // 정점을 잇는 선: 수면의 형태
-  const outlines = frames.map((f) => 'M' + Array.from({ length: VERTEX_COUNT }, (_, i) => displaced(row, i, f).map(round).join(',')).join(' L'));
+  const outlines = frames.map(
+    (f) => 'M' + Array.from({ length: VERTEX_COUNT }, (_, i) => displaced(row, i, f).map(round).join(',')).join(' L'),
+  );
   parts.push(`<path class="surface" d="${outlines[0]}">${animate('d', outlines)}</path>`);
 
   // 추적하는 정점이 그리는 궤적: 위아래로만 움직이면 선분, 좌우로도 움직이면 원이 된다.
@@ -65,8 +72,14 @@ for (const row of ROWS) {
     parts.push(`<circle class="base" cx="${round(baseX(i))}" cy="${row.y}" r="2.2"/>`);
     parts.push(
       `<circle class="${kind}" cx="${round(path[0][0])}" cy="${round(path[0][1])}" r="${i === TRACKED ? 5 : 3}">` +
-        animate('cx', path.map(([x]) => round(x))) +
-        animate('cy', path.map(([, y]) => round(y))) +
+        animate(
+          'cx',
+          path.map(([x]) => round(x)),
+        ) +
+        animate(
+          'cy',
+          path.map(([, y]) => round(y)),
+        ) +
         '</circle>',
     );
   }
