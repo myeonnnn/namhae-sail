@@ -14,6 +14,16 @@ export const LINK_STATUS_LABELS: Record<LinkStatus, string> = {
 // 메시지는 이미 문자열이므로 PeerJS의 직렬화를 거치지 않고 그대로 보낸다.
 const CONNECT_OPTIONS: PeerConnectOption = { serialization: 'raw', reliable: false };
 
+// 핸드폰은 PC와 같은 와이파이에서만 연결한다. STUN과 TURN 서버를 비워 두면 브라우저가 자기 LAN 주소만 알리므로,
+// 조종 값이 공유기 밖으로 나가지 않고, 해외에 있는 공개 중계 서버를 거쳐 느려지는 일도 없다.
+const PEER_OPTIONS = { config: { iceServers: [] } };
+
+/** 이 시간(ms) 안에 연결되지 않으면 같은 와이파이가 아닌 것으로 보고 안내한다. */
+const CONNECT_TIMEOUT_MS = 10_000;
+
+/** 연결이 늦어질 때 컨트롤러가 띄우는 안내 */
+export const SAME_WIFI_NOTICE = 'PC와 같은 와이파이에 연결되어 있는지 확인해 주세요.';
+
 /**
  * 게임 쪽의 연결. 같은 PC의 탭과 핸드폰에서 오는 조종 메시지를 같은 콜백으로 넘긴다.
  * 같은 PC의 탭은 처음부터 받고, 핸드폰은 open을 부른 뒤부터 받는다.
@@ -35,7 +45,7 @@ export class HelmHost {
    */
   open(onStatus: (status: LinkStatus, peerId?: string) => void): void {
     if (this.peer) return;
-    const peer = (this.peer = new Peer());
+    const peer = (this.peer = new Peer(PEER_OPTIONS));
     onStatus('connecting');
 
     peer.on('open', (id) => onStatus(this.connection?.open ? 'connected' : 'connecting', id));
@@ -78,7 +88,7 @@ export class HelmHost {
  */
 export function connectToGame(
   peerId: string | undefined,
-  onStatus: (status: LinkStatus) => void,
+  onStatus: (status: LinkStatus, notice?: string) => void,
 ): (text: string) => void {
   if (peerId === undefined) {
     const channel = new BroadcastChannel(HELM_CHANNEL);
@@ -88,12 +98,19 @@ export function connectToGame(
   }
 
   let connection: DataConnection | undefined;
-  const peer = new Peer();
+  const peer = new Peer(PEER_OPTIONS);
   onStatus('connecting');
+  // 다른 네트워크에 있으면 서로의 LAN 주소로 닿지 않아서, 오류 없이 연결 중에 오래 머무른다.
+  const timeout = window.setTimeout(() => {
+    if (!connection?.open) onStatus('disconnected', SAME_WIFI_NOTICE);
+  }, CONNECT_TIMEOUT_MS);
   peer.on('open', () => {
     connection = peer.connect(peerId, CONNECT_OPTIONS);
-    connection.on('open', () => onStatus('connected'));
-    connection.on('close', () => onStatus('disconnected'));
+    connection.on('open', () => {
+      window.clearTimeout(timeout);
+      onStatus('connected');
+    });
+    connection.on('close', () => onStatus('disconnected', SAME_WIFI_NOTICE));
   });
   // 페이지를 닫을 때 연결을 직접 닫아야, 게임이 끊긴 것을 기다리지 않고 바로 알 수 있다.
   window.addEventListener('pagehide', () => peer.destroy());

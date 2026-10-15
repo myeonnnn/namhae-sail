@@ -133,9 +133,12 @@ showRudder();
 
 // 주소에 게임 ID가 있으면 QR 코드로 연 핸드폰이므로 그 게임에 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.
 const statusElement = document.querySelector<HTMLElement>('#status')!;
-const send = connectToGame(peerIdFromUrl(location.href), (status) => {
+const linkNotice = document.querySelector<HTMLElement>('#link-notice')!;
+const send = connectToGame(peerIdFromUrl(location.href), (status, notice) => {
   statusElement.dataset.status = status;
   statusElement.textContent = LINK_STATUS_LABELS[status];
+  linkNotice.textContent = notice ?? '';
+  linkNotice.hidden = !notice;
 });
 
 // 값이 바뀔 때만 보내지 않고 계속 보낸다. 게임은 메시지가 계속 오는 것으로 컨트롤러가 살아 있다고 판단한다.

@@ -88,6 +88,13 @@ section {
   border-color: rgba(255, 107, 107, 0.5);
 }
 
+.notice {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--astern);
+}
+
 button {
   border-radius: 16px;
   border: 1px solid var(--border);

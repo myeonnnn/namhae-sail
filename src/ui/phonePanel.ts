@@ -24,7 +24,7 @@ export class PhonePanel {
 
     const hint = document.createElement('p');
     hint.className = 'hud-phone-hint';
-    hint.textContent = '핸드폰 카메라로 QR 코드를 찍으면 컨트롤러가 열립니다.';
+    hint.textContent = 'PC와 같은 와이파이에 연결된 핸드폰의 카메라로 QR 코드를 찍으면 컨트롤러가 열립니다.';
     this.element.append(this.status, this.qr, this.link, hint);
 
     // localhost 주소는 핸드폰에서 핸드폰 자신을 가리키므로, 개발 서버에 LAN 주소를 물어서 QR 코드에 넣는다.
