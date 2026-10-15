@@ -1,5 +1,14 @@
 import './style.css';
 import { HelmHost } from './controller/link';
+import {
+  canRunCommand,
+  decodeCommand,
+  encodeSituation,
+  type ControllerCommand,
+  type GameScene,
+  type GameSituation,
+  type MenuItem,
+} from './controller/commands';
 import { decodeHelm, encodeShipStatus, isNewPress } from './controller/protocol';
 import { checkRemoteLink, chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
 import { Input } from './core/input';
@@ -19,7 +28,7 @@ import { ImpactSpray } from './ship/impactSpray';
 import { Ship } from './ship/ship';
 import { SPORT_YACHT } from './ship/shipSpec';
 import { AmbientSound } from './ui/ambientSound';
-import { playSplash } from './ui/sound';
+import { isMuted, playSplash } from './ui/sound';
 import { createCourseList } from './ui/courseList';
 import { createButton } from './ui/dom';
 import { createDevTools } from './ui/devTools';
@@ -33,7 +42,7 @@ import { createStartPointList } from './ui/startPoints';
 import { StartScreen } from './ui/startScreen';
 import { readStartOptions } from './dev/startOptions';
 import { latLonToWorld, WORLD_ORIGIN } from './geo/projection';
-import { isOutsideRegion, REGION } from './geo/region';
+import { isOutsideRegion, REGION, type StartPoint } from './geo/region';
 import { TimeAttack } from './game/timeAttack';
 import { Coach } from './sim/coach';
 import { resolveCollisions } from './sim/collisions';
@@ -228,14 +237,16 @@ hud.setMenuContent(
 
 hud.setMenuContent(
   'start',
-  createStartPointList(REGION.starts, (point) => {
-    // 다른 곳으로 옮기면 코스를 벗어나므로, 도전하고 있었으면 그만둔다.
-    timeAttack.quit();
-    const { x, z } = latLonToWorld(point);
-    placeShip(x, z, degToRad(point.headingDeg));
-    hud.closeMenus();
-  }),
+  createStartPointList(REGION.starts, (point) => moveToStartPoint(point)),
 );
+
+function moveToStartPoint(point: StartPoint): void {
+  // 다른 곳으로 옮기면 코스를 벗어나므로, 도전하고 있었으면 그만둔다.
+  timeAttack.quit();
+  const { x, z } = latLonToWorld(point);
+  placeShip(x, z, degToRad(point.headingDeg));
+  hud.closeMenus();
+}
 
 if (DEV_TOOLS) {
   hud.setMenuContent(
@@ -288,6 +299,11 @@ let remoteNeutral = false;
 let remoteLinkActive = false;
 let remoteReset = false;
 const helmHost = new HelmHost((text) => {
+  const command = decodeCommand(text);
+  if (command) {
+    runCommand(command);
+    return;
+  }
   const message = decodeHelm(text);
   if (!message) return;
   if (isNewPress(pressCounts.neutral, message.neutralCount)) remoteNeutral = true;
@@ -298,6 +314,90 @@ const helmHost = new HelmHost((text) => {
 // 컨트롤러는 레버를 미는 방향만 보내므로, 스로틀이 지금 몇 %인지는 게임이 알려 준다.
 const STATUS_INTERVAL = 0.1;
 let statusSentAt = -Infinity;
+
+// ---- 핸드폰의 명령과 게임의 상황 ----
+
+const COURSE_ITEMS: MenuItem[] = COURSES.map(({ id, name, note }) => ({ id, name, note }));
+// 시작 위치에는 ID가 없으므로 목록의 순번을 ID로 쓴다. 목록은 게임을 연 동안 바뀌지 않는다.
+const START_ITEMS: MenuItem[] = REGION.starts.map(({ name, note }, index) => ({ id: String(index), name, note }));
+
+/** 핸드폰이 화면을 정하는 데 쓰는 지금의 상황 */
+function currentSituation(): GameSituation {
+  const race = timeAttack.summary;
+  let scene: GameScene = 'sailing';
+  if (!startScreen.dismissed) scene = startScreen.isReady ? 'start' : 'loading';
+  else if (race?.phase === 'countdown') scene = 'countdown';
+  else if (race?.phase === 'running') scene = 'racing';
+  else if (race?.phase === 'finished') scene = 'finished';
+  const situation: GameSituation = {
+    scene,
+    capsized: ship.capsized,
+    courses: COURSE_ITEMS,
+    starts: START_ITEMS,
+    seaLevel: weather.sea.level,
+    // PC에서도 도전하는 동안(결과를 보는 동안 포함)에는 파도 세기의 버튼이 잠긴다.
+    seaLevelLocked: timeAttack.active,
+    soundOn: !isMuted(),
+  };
+  if (race && scene !== 'sailing') {
+    situation.race = { courseName: race.course.name };
+    // 남은 초는 화면의 카운트다운 숫자(3, 2, 1)와 같게 올림한다. 지난 시간은 0.1초 단위로 보내서 상황이 너무 자주 바뀌지 않게 한다.
+    if (scene === 'countdown') situation.race.countdown = Math.ceil(race.countdown);
+    if (scene === 'racing') situation.race.elapsed = Math.floor(race.total * 10) / 10;
+    if (scene === 'finished') situation.race.time = race.total;
+  }
+  return situation;
+}
+
+/** 핸드폰이 보낸 명령을 PC에서 같은 버튼을 누른 것처럼 실행한다. 지금 상황에서 할 수 없는 명령은 무시한다. */
+function runCommand(command: ControllerCommand): void {
+  if (!canRunCommand(command, currentSituation())) return;
+  switch (command.kind) {
+    case 'startSailing':
+      startScreen.dismiss();
+      break;
+    case 'startRace': {
+      const course = COURSES.find(({ id }) => id === command.courseId);
+      if (!course) return;
+      startScreen.dismiss();
+      timeAttack.start(course);
+      break;
+    }
+    case 'quitRace':
+      timeAttack.quit();
+      break;
+    case 'retryRace':
+      timeAttack.retry();
+      break;
+    case 'moveToStart':
+      moveToStartPoint(REGION.starts[Number(command.startId)]);
+      break;
+    case 'setSeaLevel':
+      hud.setSeaLevel(command.level);
+      break;
+    case 'setSound':
+      hud.setSound(command.on);
+      break;
+  }
+  sendSituation();
+}
+
+// 상황은 바뀔 때만 보내되, 같은 PC의 탭처럼 연결된 순간을 알 수 없는 컨트롤러도 곧 받도록 2초마다 한 번은 다시 보낸다.
+const SITUATION_CHECK_INTERVAL = 0.25;
+const SITUATION_REPEAT_INTERVAL = 2;
+let situationCheckedAt = -Infinity;
+let situationSentAt = -Infinity;
+let lastSituation = '';
+function sendSituation(force = false): void {
+  const text = encodeSituation(currentSituation());
+  const now = performance.now() / 1000;
+  if (!force && text === lastSituation && now - situationSentAt < SITUATION_REPEAT_INTERVAL) return;
+  lastSituation = text;
+  situationSentAt = now;
+  helmHost.sendControl(text);
+}
+// 핸드폰의 명령 통로가 열리면 기다리지 않고 지금의 상황을 보낸다.
+helmHost.onControlOpen = () => sendSituation(true);
 // 메뉴와 시작 화면의 QR 코드는 같은 연결을 쓴다. 시작 화면에서 연결한 핸드폰은 시작 화면을 닫아도 그대로 남는다.
 const phonePanels = [new PhonePanel('menu')];
 let phoneConnected = false;
@@ -369,6 +469,10 @@ startLoop({
     if (ship.capsized && (resetPressed || input.consumePress('KeyR'))) {
       if (timeAttack.active) timeAttack.respawn();
       else placeShip(restart.x, restart.z, restart.heading);
+    }
+    if (elapsed - situationCheckedAt >= SITUATION_CHECK_INTERVAL) {
+      situationCheckedAt = elapsed;
+      sendSituation();
     }
     if (elapsed - statusSentAt >= STATUS_INTERVAL) {
       statusSentAt = elapsed;

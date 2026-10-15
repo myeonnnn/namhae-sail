@@ -1,4 +1,5 @@
 import './controller.css';
+import { decodeSituation, encodeCommand, type ControllerCommand, type GameSituation } from './commands';
 import { connectToGame, LINK_STATUS_LABELS } from './link';
 import { peerIdFromUrl } from './pairing';
 import { decodeShipStatus, encodeHelm, type HelmMessage } from './protocol';
@@ -177,10 +178,17 @@ document.addEventListener('pointerdown', () => void keepScreenOn(), { once: true
 
 // ---- 연결 ----
 
+// 게임이 마지막으로 알려 준 상황. 핸드폰의 화면을 상황에 맞게 바꾸는 데 쓴다.
+let situation: GameSituation | undefined;
+/** 명령을 보낸다. 연결이 끊긴 동안에는 보내지 않고 false를 돌려준다. 끊긴 동안의 명령을 모아 두었다가 나중에 보내지 않는다. */
+export function sendCommand(command: ControllerCommand): boolean {
+  return link.sendCommand(encodeCommand(command));
+}
+
 // 주소에 게임 ID가 있으면 QR 코드로 연 핸드폰이므로 그 게임에 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.
 const statusElement = $('#status');
 const linkNotice = $('#link-notice');
-const send = connectToGame(
+const link = connectToGame(
   peerIdFromUrl(location.href),
   (status, notice) => {
     statusElement.dataset.status = status;
@@ -188,8 +196,15 @@ const send = connectToGame(
     linkNotice.textContent = notice ?? '';
     linkNotice.hidden = !notice;
   },
-  showShipStatus,
+  (text) => {
+    showShipStatus(text);
+    const next = decodeSituation(text);
+    if (!next) return;
+    situation = next;
+    // 상황에 따라 화면의 배치를 CSS로 바꿀 수 있도록 body에 적어 둔다.
+    document.body.dataset.scene = situation.scene;
+  },
 );
 
 // 값이 바뀔 때만 보내지 않고 계속 보낸다. 게임은 메시지가 계속 오는 것으로 컨트롤러가 살아 있다고 판단한다.
-window.setInterval(() => send(encodeHelm(helm)), SEND_INTERVAL_MS);
+window.setInterval(() => link.sendHelm(encodeHelm(helm)), SEND_INTERVAL_MS);

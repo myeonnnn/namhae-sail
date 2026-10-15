@@ -15,6 +15,10 @@ export const LINK_STATUS_LABELS: Record<LinkStatus, string> = {
 // 메시지는 이미 문자열이므로 PeerJS의 직렬화를 거치지 않고 그대로 보낸다.
 const CONNECT_OPTIONS: PeerConnectOption = { serialization: 'raw', reliable: false };
 
+// 명령과 상황은 한 번만 보내므로 잃어버리면 안 된다. 그래서 다시 보내 주고 순서를 지키는 두 번째 통로로 주고받는다.
+const CONTROL_LABEL = 'control';
+const CONTROL_OPTIONS: PeerConnectOption = { label: CONTROL_LABEL, serialization: 'raw', reliable: true };
+
 // 핸드폰은 PC와 같은 와이파이에서만 연결한다. STUN과 TURN 서버를 비워 두면 브라우저가 자기 LAN 주소만 알리므로,
 // 조종 값이 공유기 밖으로 나가지 않고, 해외에 있는 공개 중계 서버를 거쳐 느려지는 일도 없다.
 const PEER_OPTIONS = { config: { iceServers: [] } };
@@ -39,7 +43,10 @@ export const SAME_WIFI_NOTICE = 'PC와 같은 와이파이에 연결되어 있�
 export class HelmHost {
   private peer?: Peer;
   private connection?: DataConnection;
+  private control?: DataConnection;
   private readonly channel = new BroadcastChannel(HELM_CHANNEL);
+  /** 핸드폰의 명령 통로가 열릴 때 부른다. 지금의 상황을 바로 보내는 데 쓴다. */
+  onControlOpen?: () => void;
 
   constructor(private readonly onText: (text: string) => void) {
     this.channel.addEventListener('message', (event: MessageEvent) => {
@@ -51,6 +58,12 @@ export class HelmHost {
   send(text: string): void {
     this.channel.postMessage(text);
     if (this.connection?.open) void this.connection.send(text);
+  }
+
+  /** 상황처럼 잃어버리면 안 되는 메시지를 보낸다. 같은 PC의 탭과, 핸드폰의 명령 통로로 보낸다. */
+  sendControl(text: string): void {
+    this.channel.postMessage(text);
+    if (this.control?.open) void this.control.send(text);
   }
 
   /**
@@ -65,6 +78,15 @@ export class HelmHost {
 
     peer.on('open', (id) => onStatus(this.connection?.open ? 'connected' : 'connecting', id));
     peer.on('connection', (connection) => {
+      if (connection.label === CONTROL_LABEL) {
+        this.control?.close();
+        this.control = connection;
+        connection.on('open', () => this.onControlOpen?.());
+        connection.on('data', (data) => {
+          if (typeof data === 'string') this.onText(data);
+        });
+        return;
+      }
       // 컨트롤러는 하나만 쓴다. 핸드폰 두 대가 번갈아 조종하면 배가 어느 쪽을 따르는지 알 수 없다.
       this.connection?.close();
       this.connection = connection;
@@ -100,13 +122,14 @@ export class HelmHost {
 /**
  * 컨트롤러 쪽의 연결. 게임 ID가 있으면 그 게임에 WebRTC로 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.
  * @param onText 게임이 보낸 메시지를 받을 때마다 부른다
- * @returns 조종 메시지를 보내는 함수. 연결되기 전에 보낸 메시지는 버린다
+ * @returns 조종 메시지를 보내는 sendHelm과, 명령을 보내는 sendCommand. 연결되기 전에 보낸 메시지는 버리고,
+ *   sendCommand는 보냈는지를 돌려준다
  */
 export function connectToGame(
   peerId: string | undefined,
   onStatus: (status: LinkStatus, notice?: string) => void,
   onText: (text: string) => void,
-): (text: string) => void {
+): GameLink {
   if (peerId === undefined) {
     const channel = new BroadcastChannel(HELM_CHANNEL);
     channel.addEventListener('message', (event: MessageEvent) => {
@@ -114,11 +137,16 @@ export function connectToGame(
     });
     // 같은 PC의 탭에는 연결을 맺는 과정이 없으므로, 게임 탭이 열려 있는지와 관계없이 연결된 것으로 표시한다.
     onStatus('connected');
-    return (text) => channel.postMessage(text);
+    const post = (text: string) => {
+      channel.postMessage(text);
+      return true;
+    };
+    return { sendHelm: post, sendCommand: post };
   }
 
   let peer: Peer | undefined;
   let connection: DataConnection | undefined;
+  let control: DataConnection | undefined;
   let retry: number | undefined;
   let retryDelay = RETRY_MIN_MS;
   let connectedOnce = false;
@@ -163,6 +191,13 @@ export function connectToGame(
       conn.on('close', () => {
         if (conn === connection) lost();
       });
+      const commands = (control = current.connect(peerId, CONTROL_OPTIONS));
+      commands.on('data', (data) => {
+        if (typeof data === 'string') onText(data);
+      });
+      commands.on('close', () => {
+        if (commands === control) lost();
+      });
     });
     current.on('error', (error) => {
       if (current !== peer) return;
@@ -186,7 +221,22 @@ export function connectToGame(
     closing = true;
     peer?.destroy();
   });
-  return (text) => {
-    if (connection?.open) void connection.send(text);
+  return {
+    sendHelm: (text) => {
+      if (connection?.open) void connection.send(text);
+    },
+    sendCommand: (text) => {
+      if (!control?.open) return false;
+      void control.send(text);
+      return true;
+    },
   };
+}
+
+/** 컨트롤러가 게임에 메시지를 보내는 두 통로 */
+export interface GameLink {
+  /** 조종 값. 잃어버려도 다음 값이 곧 오므로 빠른 통로로 보낸다. */
+  sendHelm: (text: string) => void;
+  /** 명령. 잃어버리면 안 되므로 다시 보내 주는 통로로 보낸다. 연결되어 있지 않아 보내지 못했으면 false */
+  sendCommand: (text: string) => boolean;
 }

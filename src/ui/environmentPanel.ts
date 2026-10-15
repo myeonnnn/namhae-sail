@@ -35,7 +35,6 @@ export class EnvironmentPanel {
     private readonly weather: Weather,
     private readonly timeOfDay: TimeOfDay,
   ) {
-    const { wind, swell, sea } = weather;
     const panel = document.createElement('div');
     panel.className = 'hud-panel hud-environment';
 
@@ -63,10 +62,7 @@ export class EnvironmentPanel {
       const button = createButton({
         content: String(index + 1),
         label: `${index + 1}단계: ${level.name}`,
-        onClick: () => {
-          selectSeaLevel(sea, index + 1, wind, swell);
-          this.refresh();
-        },
+        onClick: () => this.selectLevel(index + 1),
       });
       this.levelButtons.push(button);
       levelRow.append(button);
@@ -93,6 +89,13 @@ export class EnvironmentPanel {
     if (now - this.lastRefreshTime < REFRESH_INTERVAL_MS) return;
     this.lastRefreshTime = now;
     this.fetch = fetch;
+    this.refresh();
+  }
+
+  /** 파도 세기(1~5)를 바꾼다. 버튼을 눌렀을 때와 핸드폰에서 바꿀 때 같은 일을 한다. */
+  selectLevel(level: number): void {
+    const { sea, wind, swell } = this.weather;
+    selectSeaLevel(sea, level, wind, swell);
     this.refresh();
   }
 

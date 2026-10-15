@@ -132,6 +132,11 @@ export class StartScreen {
     return true;
   }
 
+  /** 자료를 모두 불러와서 시작할 수 있으면 true */
+  get isReady(): boolean {
+    return this.ready;
+  }
+
   /** 자료를 모두 불러왔을 때 호출한다. 진행 상태를 지우고 시작 버튼을 보여 준다. */
   markReady(): void {
     if (this.ready) return;

@@ -71,6 +71,7 @@ export class Hud {
   private readonly menuBar = document.createElement('div');
   private readonly menus: Partial<Record<MenuId, DropdownMenu>> = {};
   private readonly environment: EnvironmentPanel;
+  private readonly soundButton: HTMLButtonElement;
 
   constructor(
     private readonly root: HTMLElement,
@@ -99,17 +100,13 @@ export class Hud {
     this.menuBar.className = 'hud-menus';
     root.append(this.menuBar);
     // 소리를 켜고 끄는 버튼. 메뉴들이 나중에 추가되어도 항상 맨 오른쪽에 놓이도록 순서를 지정해 둔다.
-    const soundButton = createButton({
-      content: isMuted() ? SOUND_LABELS.off : SOUND_LABELS.on,
+    this.soundButton = createButton({
+      content: '',
       className: 'hud-menu-button hud-sound-button',
-      onClick: () => {
-        setMuted(!isMuted());
-        soundButton.textContent = isMuted() ? SOUND_LABELS.off : SOUND_LABELS.on;
-        soundButton.setAttribute('aria-pressed', String(!isMuted()));
-      },
+      onClick: () => this.setSound(isMuted()),
     });
-    soundButton.setAttribute('aria-pressed', String(!isMuted()));
-    this.menuBar.append(soundButton);
+    this.setSound(!isMuted());
+    this.menuBar.append(this.soundButton);
 
     const right = document.createElement('div');
     right.className = 'hud-column hud-column-right';
@@ -178,6 +175,18 @@ export class Hud {
   /** 메뉴 버튼의 이름과 상태를 바꾼다. 이름을 지정하지 않으면 원래 이름으로 되돌린다. */
   setMenuLabel(menu: MenuId, label = MENU_LABELS[menu], state?: string): void {
     this.menu(menu).setLabel(label, state);
+  }
+
+  /** 소리를 켜거나 끄고, 버튼의 글자를 맞춘다. 핸드폰에서 바꿀 때도 PC의 버튼과 같은 결과가 되게 한다. */
+  setSound(on: boolean): void {
+    setMuted(!on);
+    this.soundButton.textContent = on ? SOUND_LABELS.on : SOUND_LABELS.off;
+    this.soundButton.setAttribute('aria-pressed', String(on));
+  }
+
+  /** 파도 세기를 바꾼다. 환경 패널의 1~5 버튼을 누른 것과 같다. */
+  setSeaLevel(level: number): void {
+    this.environment.selectLevel(level);
   }
 
   closeMenus(): void {

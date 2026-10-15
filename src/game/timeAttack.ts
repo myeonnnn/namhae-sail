@@ -3,7 +3,7 @@ import type { Course } from '../course/course';
 import type { RaceResult, RecordStore } from '../course/records';
 import { selectSeaLevel } from '../environment/seaState';
 import type { Weather } from '../environment/weather';
-import { CAPSIZE_PENALTY, COUNTDOWN_SECONDS, Race } from '../sim/race';
+import { CAPSIZE_PENALTY, COUNTDOWN_SECONDS, Race, type RacePhase } from '../sim/race';
 import type { SeaEffects } from '../sim/seaEffects';
 import type { Ship } from '../ship/ship';
 import type { Hud } from '../ui/hud';
@@ -52,6 +52,18 @@ export class TimeAttack {
   /** 도전하는 동안 날씨의 변화에 사용할 난수. 도전하고 있지 않으면 undefined이다. */
   get weatherRandom(): (() => number) | undefined {
     return this.race ? this.random : undefined;
+  }
+
+  /** 도전하고 있는 코스와 진행 상황. 핸드폰에 알려 주는 데 쓴다. 도전하고 있지 않으면 undefined이다. */
+  get summary(): { phase: RacePhase; course: Course; countdown: number; total: number } | undefined {
+    const { race } = this;
+    if (!race) return undefined;
+    return { phase: race.phase, course: race.course, countdown: race.countdown, total: race.total };
+  }
+
+  /** 같은 코스를 처음부터 다시 도전한다. 결과 화면의 "다시 도전"과 같다. */
+  retry(): void {
+    if (this.race) this.start(this.race.course);
   }
 
   /** 코스의 출발 위치에서 카운트다운부터 시작한다. */
