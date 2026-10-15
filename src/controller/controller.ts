@@ -14,6 +14,26 @@ const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>
 // 길게 누르면 iOS가 띄우는 메뉴와 확대 돋보기를 막는다. 스로틀 버튼은 누르고 있는 것이 기본 동작이다.
 document.addEventListener('contextmenu', (event) => event.preventDefault());
 
+// ---- 확대 방지 ----
+
+// 아이폰 Safari는 viewport의 user-scalable=no를 무시해서, 두 손가락으로 벌리거나 두 번 탭하면 화면이 확대된다.
+// 이 페이지는 touch-action: none이라 확대된 뒤에는 다시 축소할 수도 없으므로, 확대 제스처를 막는다.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick']) {
+  document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+}
+
+// 그래도 확대되면(가로로 돌릴 때 Safari가 확대한 채로 두는 경우 등) viewport 설정을 다시 써서 원래 크기로 되돌린다.
+// Safari는 viewport의 내용이 바뀌면 배율을 다시 계산한다.
+const viewportMeta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+function resetZoom(): void {
+  if (!viewportMeta || !window.visualViewport || window.visualViewport.scale <= 1.01) return;
+  const content = viewportMeta.content;
+  viewportMeta.content = `${content}, minimum-scale=1.0`;
+  requestAnimationFrame(() => (viewportMeta.content = content));
+}
+window.visualViewport?.addEventListener('resize', resetZoom);
+window.addEventListener('orientationchange', () => window.setTimeout(resetZoom, 300));
+
 // ---- 스로틀 ----
 
 /**
