@@ -11,7 +11,7 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
-          exclude: ['src/**/*.integration.test.ts', 'src/**/*.browser.test.ts'],
+          exclude: ['src/**/*.integration.test.ts', 'src/**/*.browser.test.ts', 'scripts/**/*.integration.test.mjs'],
         },
       },
       {
@@ -19,7 +19,7 @@ export default defineConfig({
         test: {
           name: 'integration',
           environment: 'node',
-          include: ['src/**/*.integration.test.ts'],
+          include: ['src/**/*.integration.test.ts', 'scripts/**/*.integration.test.mjs'],
         },
       },
       {

@@ -77,4 +77,20 @@ export const FAULTS = [
     replace: '(towardStarboard + slam * Math.sign(load.surfaceSlope))',
     covered: false,
   },
+  {
+    name: '메인 에이전트도 테스트 파일을 고칠 수 있음',
+    why: '훅의 판정이 뒤집히면 "구현하는 쪽은 테스트를 고치지 않는다"는 규칙이 아무 경고 없이 사라진다.',
+    file: 'scripts/hooks/lib.mjs',
+    find: 'if (input.agent_type === TEST_WRITER) return { allow: true };',
+    replace: 'if (input.agent_type !== TEST_WRITER) return { allow: true };',
+    covered: true,
+  },
+  {
+    name: 'Stop 훅이 같은 실패로 끝없이 막음',
+    why: '고치지 않은 채 다시 끝내려 할 때에도 검사를 반복하면, 모델이 빠져나오지 못하고 같은 실패를 되풀이한다.',
+    file: 'scripts/hooks/lib.mjs',
+    find: 'if (stopHookActive && fingerprint === lastFailed) return',
+    replace: 'if (false && fingerprint === lastFailed) return',
+    covered: true,
+  },
 ];
