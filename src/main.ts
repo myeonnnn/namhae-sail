@@ -24,6 +24,7 @@ import { Ocean, SHALLOW_RANGE } from './ocean/ocean';
 import { Wake } from './ocean/wake';
 import { currentWaveHeight, updateWaves } from './ocean/waves';
 import { ChaseCamera } from './ship/chaseCamera';
+import { respawnHeading } from './sim/respawn';
 import { ImpactSpray } from './ship/impactSpray';
 import { Ship } from './ship/ship';
 import { SPORT_YACHT } from './ship/shipSpec';
@@ -140,8 +141,6 @@ function playImpact(speed: number, movingAhead: boolean, strength: number): void
   chaseCamera.shake(intensity);
 }
 
-// 배가 뒤집혔을 때 되돌아갈 위치. 마지막으로 배를 놓은 곳이다.
-const restart = { x: ship.state.x, z: ship.state.z, heading: ship.state.heading };
 const seaEffects = new SeaEffects(ship, SHIP.model, impactSpray, chaseCamera, showAlert, playSplash);
 
 function degToRad(degrees: number): number {
@@ -179,7 +178,6 @@ function moveShipToObserver(): void {
 function placeShip(x: number, z: number, heading: number): void {
   Object.assign(ship.state, { x, z, heading, surge: 0, sway: 0, yawRate: 0 });
   ship.recover();
-  Object.assign(restart, { x, z, heading });
   ship.controls.throttle = 0;
   ship.controls.rudder = 0;
   // 이전의 위치에서 새 위치까지 항적이 이어지지 않도록 기록을 지운다.
@@ -480,7 +478,8 @@ startLoop({
     remoteReset = false;
     if (ship.capsized && (resetPressed || input.consumePress('KeyR'))) {
       if (timeAttack.active) timeAttack.respawn();
-      else placeShip(restart.x, restart.z, restart.heading);
+      // 자유 항해에서는 처음 자리로 되돌리지 않고, 뒤집힌 그 자리에서 파도를 선수로 받도록 세워서 이어 가게 한다.
+      else placeShip(ship.state.x, ship.state.z, respawnHeading(ship.state.heading, wind));
     }
     if (elapsed - situationCheckedAt >= SITUATION_CHECK_INTERVAL) {
       situationCheckedAt = elapsed;

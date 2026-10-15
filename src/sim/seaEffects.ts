@@ -7,7 +7,7 @@ import type { ShipSpec } from '../ship/shipSpec';
 const BREAKER_THRESHOLD = 0.03;
 // 같은 파도에서 연달아 일으키지 않도록 두는 간격 (초)
 const BREAKER_INTERVAL = 1.2;
-const DEFAULT_CAPSIZE_MESSAGE = '전복되었습니다: R 키로 다시 시작';
+const DEFAULT_CAPSIZE_MESSAGE = '전복되었습니다: R 키로 그 자리에서 다시 세우기';
 
 /** 전복되는 순간과, 부서지는 파도가 선체의 옆면을 때리는 순간을 물보라와 카메라의 흔들림으로 연출한다. */
 export class SeaEffects {
