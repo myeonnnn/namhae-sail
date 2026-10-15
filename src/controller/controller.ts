@@ -1,5 +1,7 @@
 import './controller.css';
-import { encodeHelm, HELM_CHANNEL, type HelmMessage } from './protocol';
+import { connectToGame, LINK_STATUS_LABELS } from './link';
+import { peerIdFromUrl } from './pairing';
+import { encodeHelm, type HelmMessage } from './protocol';
 
 // 게임은 메시지가 0.5초 끊기면 키보드로 돌아가므로, 그보다 충분히 자주 보낸다.
 const SEND_INTERVAL_MS = 1000 / 30;
@@ -90,6 +92,12 @@ bindSlider(
 );
 document.querySelector<HTMLButtonElement>('#neutral')!.addEventListener('click', () => setThrottle(0));
 
+// 주소에 게임 ID가 있으면 QR 코드로 연 핸드폰이므로 그 게임에 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.
+const statusElement = document.querySelector<HTMLElement>('#status')!;
+const send = connectToGame(peerIdFromUrl(location.href), (status) => {
+  statusElement.dataset.status = status;
+  statusElement.textContent = LINK_STATUS_LABELS[status];
+});
+
 // 값이 바뀔 때만 보내지 않고 계속 보낸다. 게임은 메시지가 계속 오는 것으로 컨트롤러가 살아 있다고 판단한다.
-const channel = new BroadcastChannel(HELM_CHANNEL);
-window.setInterval(() => channel.postMessage(encodeHelm(helm)), SEND_INTERVAL_MS);
+window.setInterval(() => send(encodeHelm(helm)), SEND_INTERVAL_MS);

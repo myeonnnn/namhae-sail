@@ -41,10 +41,16 @@ export interface HudFrame {
 }
 
 /** 왼쪽 위에 나란히 놓는 메뉴 */
-export type MenuId = 'race' | 'start' | 'help' | 'dev';
-const MENU_LABELS: Record<MenuId, string> = { race: '타임어택', start: '시작 위치', help: '도움말', dev: '개발 도구' };
+export type MenuId = 'race' | 'start' | 'phone' | 'help' | 'dev';
+const MENU_LABELS: Record<MenuId, string> = {
+  race: '타임어택',
+  start: '시작 위치',
+  phone: '핸드폰 연결',
+  help: '도움말',
+  dev: '개발 도구',
+};
 // 왼쪽부터 놓는 순서
-const MENU_ORDER: MenuId[] = ['race', 'start', 'help', 'dev'];
+const MENU_ORDER: MenuId[] = ['race', 'start', 'phone', 'help', 'dev'];
 const SOUND_LABELS = { on: '소리 켜짐', off: '소리 꺼짐' };
 
 /**
@@ -160,8 +166,8 @@ export class Hud {
   }
 
   /** 왼쪽 위의 메뉴에 내용을 제목 없이 그대로 넣는다. 내용이 한 가지뿐인 메뉴에 사용한다. */
-  setMenuContent(menu: MenuId, content: HTMLElement): void {
-    this.menu(menu).setContent(content);
+  setMenuContent(menu: MenuId, content: HTMLElement, onOpen?: () => void): void {
+    this.menu(menu).setContent(content, onOpen);
   }
 
   /** 메뉴가 아직 없으면 만든다. 개발 도구의 메뉴가 배포한 화면에 나타나지 않는 것은, 그 내용을 넣는 코드가 실행되지 않기 때문이다. */

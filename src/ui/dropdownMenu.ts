@@ -7,6 +7,7 @@ import { createButton } from './dom';
 export class DropdownMenu {
   private readonly button: HTMLButtonElement;
   private readonly dropdown = document.createElement('div');
+  private onOpen?: () => void;
 
   /**
    * @param bar 메뉴의 버튼들을 나란히 놓는 요소
@@ -41,8 +42,12 @@ export class DropdownMenu {
     bar.append(container);
   }
 
-  /** 메뉴의 내용을 제목 없이 그대로 넣는다. 내용이 한 가지뿐인 메뉴에 사용한다. */
-  setContent(content: HTMLElement): void {
+  /**
+   * 메뉴의 내용을 제목 없이 그대로 넣는다. 내용이 한 가지뿐인 메뉴에 사용한다.
+   * @param onOpen 메뉴를 열 때마다 부른다. 열기 전에는 준비할 필요가 없는 내용에 사용한다
+   */
+  setContent(content: HTMLElement, onOpen?: () => void): void {
+    this.onOpen = onOpen;
     content.classList.add('hud-menu-content', 'hud-menu-single');
     this.dropdown.append(content);
   }
@@ -76,5 +81,6 @@ export class DropdownMenu {
   private setOpen(open: boolean): void {
     this.dropdown.hidden = !open;
     this.button.setAttribute('aria-expanded', String(open));
+    if (open) this.onOpen?.();
   }
 }

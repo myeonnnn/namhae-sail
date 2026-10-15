@@ -1258,3 +1258,60 @@ body {
   font: 400 13px/1.4 var(--hud-font);
   text-decoration: underline;
 }
+
+/* ---- 핸드폰 연결 ---- */
+
+.hud-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 240px;
+  color: var(--hud-text);
+  font: 13px/1.5 var(--hud-font);
+}
+
+.hud-phone-status {
+  color: var(--hud-text-muted);
+}
+
+.hud-phone-status[data-status='connected'] {
+  color: var(--hud-starboard);
+}
+
+.hud-phone-status[data-status='disconnected'] {
+  color: var(--hud-port);
+}
+
+/* 어두운 화면 위에서도 카메라가 읽을 수 있도록 QR 코드는 흰 바탕에 둔다. */
+.hud-phone-qr {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.hud-phone-qr:empty {
+  background: var(--hud-track);
+}
+
+.hud-phone-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hud-phone-link {
+  color: var(--hud-ahead);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.hud-phone-hint,
+.hud-phone-warning {
+  margin: 0;
+  color: var(--hud-text-muted);
+}
+
+.hud-phone-warning {
+  color: var(--hud-astern);
+}

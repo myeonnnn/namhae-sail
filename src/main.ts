@@ -1,5 +1,6 @@
 import './style.css';
-import { decodeHelm, HELM_CHANNEL } from './controller/protocol';
+import { HelmHost } from './controller/link';
+import { decodeHelm } from './controller/protocol';
 import { chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
 import { Input } from './core/input';
 import { Observer } from './core/observer';
@@ -23,6 +24,7 @@ import { createCourseList } from './ui/courseList';
 import { createButton } from './ui/dom';
 import { createDevTools } from './ui/devTools';
 import { Guide } from './ui/guide';
+import { PhonePanel } from './ui/phonePanel';
 import { createKeyGuide } from './ui/keyGuide';
 import { Hud } from './ui/hud';
 import { RaceHud } from './ui/raceHud';
@@ -275,13 +277,18 @@ let assetsDone = false;
 void assetsLoaded.then(() => (assetsDone = true));
 window.setTimeout(() => startScreen.markReady(), 15000);
 
-// 컨트롤러 페이지가 보낸 마지막 조종 값. 받은 시각을 함께 두어, 메시지가 끊기면 키보드로 돌아간다.
+// ---- 핸드폰 컨트롤러 ----
+// 컨트롤러가 보낸 마지막 조종 값. 받은 시각을 함께 두어, 메시지가 끊기면 키보드로 돌아간다.
 // 형식이 맞지 않는 메시지는 버리고 직전 값을 그대로 둔다.
 let remoteHelm: RemoteHelm | undefined;
-new BroadcastChannel(HELM_CHANNEL).addEventListener('message', (event: MessageEvent) => {
-  const message = typeof event.data === 'string' ? decodeHelm(event.data) : undefined;
+const helmHost = new HelmHost((text) => {
+  const message = decodeHelm(text);
   if (message) remoteHelm = { ...message, receivedAt: performance.now() / 1000 };
 });
+const phonePanel = new PhonePanel();
+hud.setMenuContent('phone', phonePanel.element, () =>
+  helmHost.open((status, peerId) => phonePanel.setStatus(status, peerId)),
+);
 
 // 물리의 한 스텝에서 선박이 이동하기 전의 위치. 관문을 지났는지 판정하는 데 사용한다.
 const stepStart = { x: 0, z: 0 };
