@@ -326,22 +326,15 @@ button {
   color: #04121d;
 }
 
+/* 다른 버튼과 같은 모양(.action)을 쓰고, 모서리도 스로틀 버튼과 맞춘다. */
 .neutral {
-  width: min(200px, 90%);
-  height: 48px;
-  border-radius: 999px;
-  border: 1px solid var(--key-edge);
-  background: linear-gradient(180deg, #2b333d, var(--key));
-  box-shadow:
-    0 4px 0 #0a0d11,
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  letter-spacing: 0.2em;
-}
-
-.neutral:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 #0a0d11;
-  background: var(--key-pressed);
+  flex-direction: row;
+  width: min(220px, 90%);
+  height: 52px;
+  /* 타 막대와 붙어 보이지 않게, 핸들 쪽 정보와 버튼 사이를 띄운다. */
+  margin-top: 14px;
+  border-radius: 18px;
+  letter-spacing: 0.06em;
 }
 
 /* ---- 오른쪽: 스로틀 ---- */
