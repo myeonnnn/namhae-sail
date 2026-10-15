@@ -175,6 +175,11 @@ export class Hud {
     return (this.menus[id] ??= new DropdownMenu(this.menuBar, MENU_LABELS[id], MENU_ORDER.indexOf(id)));
   }
 
+  /** 메뉴 버튼의 이름과 상태를 바꾼다. 이름을 지정하지 않으면 원래 이름으로 되돌린다. */
+  setMenuLabel(menu: MenuId, label = MENU_LABELS[menu], state?: string): void {
+    this.menu(menu).setLabel(label, state);
+  }
+
   closeMenus(): void {
     for (const menu of Object.values(this.menus)) menu.close();
   }

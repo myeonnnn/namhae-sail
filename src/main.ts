@@ -298,8 +298,17 @@ const STATUS_INTERVAL = 0.1;
 let statusSentAt = -Infinity;
 // 메뉴와 시작 화면의 QR 코드는 같은 연결을 쓴다. 시작 화면에서 연결한 핸드폰은 시작 화면을 닫아도 그대로 남는다.
 const phonePanels = [new PhonePanel('menu')];
+let phoneConnected = false;
 const openPhoneLink = () =>
-  helmHost.open((status, peerId) => phonePanels.forEach((panel) => panel.setStatus(status, peerId)));
+  helmHost.open((status, peerId) => {
+    phonePanels.forEach((panel) => panel.setStatus(status, peerId));
+    const connected = status === 'connected';
+    if (connected === phoneConnected) return;
+    phoneConnected = connected;
+    // 연결되면 QR 코드는 더 볼 일이 없으므로 메뉴를 닫고, 메뉴를 열지 않아도 연결된 것을 알 수 있게 버튼에 표시한다.
+    if (connected) hud.closeMenus();
+    hud.setMenuLabel('phone', connected ? '핸드폰 연결됨' : undefined, connected ? 'connected' : undefined);
+  });
 hud.setMenuContent('phone', phonePanels[0].element, openPhoneLink);
 const startPhonePanel = new PhonePanel('start');
 if (startScreen.addAside(startPhonePanel.element)) {

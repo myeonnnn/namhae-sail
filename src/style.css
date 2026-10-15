@@ -493,6 +493,41 @@ body {
   color: #0b1a2a;
 }
 
+/* 핸드폰이 연결되어 있는 동안에는 버튼에 초록색 점을 켜서, 메뉴를 열지 않아도 연결된 것을 알 수 있게 한다. */
+#hud .hud-menu-button[data-state='connected'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-color: rgba(95, 211, 138, 0.6);
+  color: var(--hud-starboard);
+}
+
+#hud .hud-menu-button[data-state='connected']::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hud-starboard);
+  box-shadow: 0 0 6px var(--hud-starboard);
+  animation: hud-link-pulse 1.6s ease-in-out infinite;
+}
+
+#hud .hud-menu-button[data-state='connected'][aria-expanded='true'] {
+  color: #0b1a2a;
+}
+
+@keyframes hud-link-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hud .hud-menu-button[data-state='connected']::before {
+    animation: none;
+  }
+}
+
 #hud .hud-sound-button[aria-pressed='false'] {
   color: var(--hud-text-muted);
 }

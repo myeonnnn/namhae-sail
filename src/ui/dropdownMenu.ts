@@ -73,6 +73,16 @@ export class DropdownMenu {
     this.dropdown.append(section);
   }
 
+  /**
+   * 버튼의 이름과 상태를 바꾼다. 메뉴를 열지 않아도 상태를 알 수 있게 할 때 쓴다.
+   * @param state 버튼의 data-state에 넣는 값. CSS가 이 값으로 모양을 바꾼다. 지정하지 않으면 지운다
+   */
+  setLabel(label: string, state?: string): void {
+    this.button.textContent = label;
+    if (state) this.button.dataset.state = state;
+    else delete this.button.dataset.state;
+  }
+
   /** 메뉴를 닫는다. 메뉴 안의 항목을 골랐을 때, 화면을 가리지 않도록 호출한다. */
   close(): void {
     this.setOpen(false);
