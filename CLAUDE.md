@@ -28,6 +28,6 @@ pnpm verify:harness   # 테스트 하네스 검증 (약 20초)
 - 수면의 형태나 `BREAKING_STEEPNESS`를 바꾸면 전복 빈도가 달라진다. 바꾸기 전과 후를 같은 조건의 모의 실험으로 비교한다.
 - 수면과 날씨에는 `Math.random` 대신 `src/core/random.ts`의 `seededRandom`을 쓴다. 타임어택은 같은 바다를 재현해야 한다.
 - 테스트 파일의 이름이 분류를 정한다: `*.test.ts`(단위, 파일당 0.5초), `*.integration.test.ts`(통합, 5초), `*.browser.test.ts`(WebGL이 필요할 때만, 5초).
-- 기능을 추가하거나 동작을 바꿀 때는 `/feature`의 순서를 따른다. 테스트는 `test-writer` 에이전트만 쓴다.
+- 기능을 추가하거나 동작을 바꿀 때는 `/feature`의 순서를 따른다. 테스트는 `test-writer` 에이전트만 쓰고, 기대값은 `docs/spec.md`에서 가져온다.
 - 코드 주석은 한국어로 "왜"를 설명하고, 커밋 메시지는 영어로 쓴다. 커밋은 기능별로 나누고, 각 커밋이 typecheck와 test를 통과해야 한다.
 - 헤드리스 브라우저 측정은 한 번에 하나만 실행한다. 동시에 돌리면 GPU를 나눠 써서 사용자의 화면이 끊긴다.
