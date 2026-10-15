@@ -182,12 +182,13 @@ export interface SeaCascade {
   displacement: THREE.Texture;
   /** (x 방향의 기울기, z 방향의 기울기, 접힌 정도, 마루의 가파름) */
   gradient: THREE.Texture;
+  /** 위의 두 텍스처를 담은 렌더 타깃. 테스트에서 GPU가 계산한 값을 읽어 오는 데 쓴다. */
+  displacementTarget: THREE.WebGLRenderTarget;
+  gradientTarget: THREE.WebGLRenderTarget;
 }
 
 interface Cascade extends SeaCascade {
   spec: CascadeSpec;
-  displacementTarget: THREE.WebGLRenderTarget;
-  gradientTarget: THREE.WebGLRenderTarget;
 }
 
 /**

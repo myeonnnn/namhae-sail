@@ -4,3 +4,4 @@ dist
 *.local
 kenney_watercraft-pack/
 .cache
+.vitest

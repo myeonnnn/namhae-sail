@@ -8,7 +8,9 @@
 ```bash
 pnpm dev          # 개발 서버, 포트 5190 고정 (vite.config.ts의 strictPort)
 pnpm typecheck
-pnpm test         # vitest
+pnpm test         # vitest: Node 테스트와 브라우저 테스트(*.browser.test.ts)를 함께 실행
+pnpm vitest run --project unit      # Node 테스트만
+pnpm vitest run --project browser   # WebGL이 필요한 테스트만 (설치된 Chrome을 헤드리스로 사용)
 pnpm build        # typecheck + vite build
 npx prettier --single-quote --print-width 120 --write <파일>
 ```
