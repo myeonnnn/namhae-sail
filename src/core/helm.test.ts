@@ -29,24 +29,7 @@ function applyChosen(
 }
 
 describe('조타 명령의 반영', () => {
-  it('스로틀 값이 주어지면 배의 스로틀은 서서히가 아니라 바로 그 값이 된다', () => {
-    for (const throttle of [1, -1, 0, 0.35, -0.6]) {
-      const c = controls(0.2, 0);
-      applyHelm(c, { throttleRate: 0, neutral: false, rudder: 0, throttle }, RATES, DT);
-      expect(c.throttle).toBe(throttle);
-    }
-  });
-
-  it('주어진 스로틀 값이 -1~1을 벗어나면 끝값으로 제한한다', () => {
-    const forward = controls();
-    applyHelm(forward, { throttleRate: 0, neutral: false, rudder: 0, throttle: 3 }, RATES, DT);
-    expect(forward.throttle).toBe(1);
-    const reverse = controls();
-    applyHelm(reverse, { throttleRate: 0, neutral: false, rudder: 0, throttle: -2.5 }, RATES, DT);
-    expect(reverse.throttle).toBe(-1);
-  });
-
-  it('스로틀 값이 없으면 키보드처럼 레버의 빠르기만큼 서서히 움직이고 -1~1에 머문다', () => {
+  it('스로틀은 레버의 빠르기만큼 서서히 움직이고 -1~1에 머문다', () => {
     const c = controls(0, 0);
     applyHelm(c, { throttleRate: 1, neutral: false, rudder: 0 }, RATES, 0.1);
     // 0.8/s × 0.1s = 0.08
@@ -101,17 +84,85 @@ describe('조타 명령의 반영', () => {
 });
 
 describe('조종 장치의 선택', () => {
-  const remote = (throttle: number, rudder: number, receivedAt: number): RemoteHelm => ({
-    throttle,
+  const remote = (throttleRate: number, rudder: number, receivedAt: number): RemoteHelm => ({
+    throttleRate,
     rudder,
     receivedAt,
   });
 
-  it('컨트롤러의 명령이 새로우면 배의 스로틀은 바로 컨트롤러의 값이 된다', () => {
-    for (const throttle of [1, -1, 0, 0.55]) {
-      const result = applyChosen(controls(0.2, 0), IDLE_KEYBOARD, false, remote(throttle, 0, 10), 10.1);
-      expect(result.throttle).toBe(throttle);
+  /** W를 누르고 있는 키보드 */
+  const HOLD_W: HelmCommand = { throttleRate: 1, neutral: false, rudder: 0 };
+  /** S를 누르고 있는 키보드 */
+  const HOLD_S: HelmCommand = { throttleRate: -1, neutral: false, rudder: 0 };
+
+  it('컨트롤러의 올림 버튼을 누르고 있으면 W를 누르고 있을 때와 같은 빠르기로 스로틀이 올라간다', () => {
+    const byRemote = applyChosen(controls(0.1, 0), IDLE_KEYBOARD, false, remote(1, 0, 10), 10.1, 0.25);
+    const byKeyboard = applyChosen(controls(0.1, 0), HOLD_W, true, undefined, 10.1, 0.25);
+    // 0.1 + 0.8/s × 0.25s = 0.3
+    expect(byRemote.throttle).toBeCloseTo(0.3, 12);
+    expect(byRemote.throttle).toBe(byKeyboard.throttle);
+  });
+
+  it('컨트롤러의 내림 버튼을 누르고 있으면 S를 누르고 있을 때와 같은 빠르기로 스로틀이 내려간다', () => {
+    const byRemote = applyChosen(controls(0.5, 0), IDLE_KEYBOARD, false, remote(-1, 0, 10), 10.1, 0.25);
+    const byKeyboard = applyChosen(controls(0.5, 0), HOLD_S, true, undefined, 10.1, 0.25);
+    // 0.5 - 0.8/s × 0.25s = 0.3
+    expect(byRemote.throttle).toBeCloseTo(0.3, 12);
+    expect(byRemote.throttle).toBe(byKeyboard.throttle);
+  });
+
+  it('컨트롤러의 버튼을 누르고 있어도 스로틀은 한 번에 끝까지 가지 않고, 계속 누르면 ±1에 머문다', () => {
+    let c = controls();
+    c = applyChosen(c, IDLE_KEYBOARD, false, remote(1, 0, 10), 10.1, DT);
+    // 한 프레임에는 0.8/s × (1/60)s만큼만 움직인다
+    expect(c.throttle).toBeCloseTo(0.8 / 60, 12);
+    // 0에서 1까지 1/0.8 = 1.25초가 걸린다. 그보다 오래(2초) 누르고 있어도 1을 넘지 않는다.
+    for (let i = 0; i < 120; i++) c = applyChosen(c, IDLE_KEYBOARD, false, remote(1, 0, 10), 10.1, DT);
+    expect(c.throttle).toBe(1);
+
+    let back = controls();
+    for (let i = 0; i < 120; i++) back = applyChosen(back, IDLE_KEYBOARD, false, remote(-1, 0, 10), 10.1, DT);
+    expect(back.throttle).toBe(-1);
+  });
+
+  it('컨트롤러의 버튼에서 손을 떼면 배의 스로틀은 그 값에 머무른다', () => {
+    for (const throttle of [0.42, -0.3, 1, -1, 0]) {
+      let c = controls(throttle, 0);
+      // 버튼을 모두 뗀 컨트롤러의 메시지가 1초 동안 계속 온다
+      for (let i = 0; i < 60; i++) c = applyChosen(c, IDLE_KEYBOARD, false, remote(0, 0, 10), 10.1, DT);
+      expect(c.throttle).toBe(throttle);
     }
+  });
+
+  it('키보드로 바꾼 스로틀은 키를 놓고 컨트롤러로 돌아온 뒤에도 그대로 남고, 컨트롤러는 그 값에서부터 레버를 민다', () => {
+    let c = controls();
+    // 컨트롤러가 연결되어 버튼을 뗀 메시지를 보내는 중에, W를 0.5초 누른다: 0.8/s × 0.5s = 0.4
+    for (let i = 0; i < 5; i++) c = applyChosen(c, HOLD_W, true, remote(0, 0, 10), 10.1, 0.1);
+    expect(c.throttle).toBeCloseTo(0.4, 12);
+    const afterKeyboard = c.throttle;
+
+    // 키를 놓으면 컨트롤러를 따른다. 컨트롤러의 버튼은 떼어져 있으므로 스로틀은 그대로다.
+    for (let i = 0; i < 60; i++) c = applyChosen(c, IDLE_KEYBOARD, false, remote(0, 0, 10), 10.1, DT);
+    expect(c.throttle).toBe(afterKeyboard);
+
+    // 컨트롤러의 올림 버튼을 0.25초 누르면 키보드가 남긴 값에서부터 올라간다: 0.4 + 0.2 = 0.6
+    c = applyChosen(c, IDLE_KEYBOARD, false, remote(1, 0, 10), 10.1, 0.25);
+    expect(c.throttle).toBeCloseTo(0.6, 12);
+  });
+
+  it('컨트롤러로 바꾼 스로틀도 키보드로 넘어간 뒤에 그대로 남고, 키보드는 그 값에서부터 레버를 민다', () => {
+    let c = controls();
+    c = applyChosen(c, IDLE_KEYBOARD, false, remote(1, 0, 10), 10.1, 0.5);
+    expect(c.throttle).toBeCloseTo(0.4, 12);
+    const afterRemote = c.throttle;
+
+    // 컨트롤러의 연결이 끊겨 메시지가 오래되면 키보드를 따른다. 아무 키도 누르지 않았으므로 그대로다.
+    c = applyChosen(c, IDLE_KEYBOARD, false, remote(1, 0, 10), 20, 1);
+    expect(c.throttle).toBe(afterRemote);
+
+    // S를 0.25초 누르면 그 값에서부터 내려간다: 0.4 - 0.2 = 0.2
+    c = applyChosen(c, HOLD_S, true, remote(1, 0, 10), 20, 0.25);
+    expect(c.throttle).toBeCloseTo(0.2, 12);
   });
 
   it('컨트롤러로 조종해도 타는 키보드와 같은 빠르기로 목표를 향해 움직인다', () => {
@@ -122,15 +173,10 @@ describe('조종 장치의 선택', () => {
     expect(byRemote.rudder).toBeCloseTo(0.1, 12);
     expect(byRemote.rudder).toBe(byKeyboard.rudder);
 
-    // 슬라이더의 중간 위치를 목표로 삼고, 그 위치에 이르면 멈춘다.
+    // 기울기의 중간 위치를 목표로 삼고, 그 위치에 이르면 멈춘다.
     let c = controls();
     for (let i = 0; i < 120; i++) c = applyChosen(c, IDLE_KEYBOARD, false, remote(0, -0.4, 10), 10.1);
     expect(c.rudder).toBe(-0.4);
-  });
-
-  it('컨트롤러의 스로틀이 0이면 배의 스로틀은 중립이 된다', () => {
-    const result = applyChosen(controls(0.9, 0), IDLE_KEYBOARD, false, remote(0, 0, 10), 10.1);
-    expect(result.throttle).toBe(0);
   });
 
   it('조종 키를 누르고 있으면 컨트롤러의 명령이 새로워도 키보드를 따른다', () => {
@@ -163,10 +209,11 @@ describe('조종 장치의 선택', () => {
   it('마지막 메시지가 0.5초 안이면 컨트롤러를 따르고, 정확히 0.5초는 아직 오래된 것이 아니다', () => {
     // 10과 10.5는 2진수로 정확히 나타나므로 차이가 정확히 0.5다.
     for (const now of [10, 10.25, 10.5]) {
-      const result = applyChosen(controls(0, 0), IDLE_KEYBOARD, false, remote(-0.7, 0, 10), now);
-      expect(result.throttle).toBe(-0.7);
+      const result = applyChosen(controls(0, 0), IDLE_KEYBOARD, false, remote(-1, 0, 10), now, 0.25);
+      // 내림 버튼을 따른다: 0 - 0.8 × 0.25 = -0.2
+      expect(result.throttle).toBeCloseTo(-0.2, 12);
     }
-    const stale = applyChosen(controls(0, 0), IDLE_KEYBOARD, false, remote(-0.7, 0, 10), 10.5001);
+    const stale = applyChosen(controls(0, 0), IDLE_KEYBOARD, false, remote(-1, 0, 10), 10.5001, 0.25);
     expect(stale.throttle).toBe(0);
   });
 

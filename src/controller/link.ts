@@ -31,11 +31,18 @@ export const SAME_WIFI_NOTICE = 'PC와 같은 와이파이에 연결되어 있�
 export class HelmHost {
   private peer?: Peer;
   private connection?: DataConnection;
+  private readonly channel = new BroadcastChannel(HELM_CHANNEL);
 
   constructor(private readonly onText: (text: string) => void) {
-    new BroadcastChannel(HELM_CHANNEL).addEventListener('message', (event: MessageEvent) => {
+    this.channel.addEventListener('message', (event: MessageEvent) => {
       if (typeof event.data === 'string') onText(event.data);
     });
+  }
+
+  /** 연결된 컨트롤러에 메시지를 보낸다. 같은 PC의 탭과 핸드폰 모두에 보내고, 연결된 핸드폰이 없으면 핸드폰에는 보내지 않는다. */
+  send(text: string): void {
+    this.channel.postMessage(text);
+    if (this.connection?.open) void this.connection.send(text);
   }
 
   /**
@@ -84,14 +91,19 @@ export class HelmHost {
 
 /**
  * 컨트롤러 쪽의 연결. 게임 ID가 있으면 그 게임에 WebRTC로 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.
+ * @param onText 게임이 보낸 메시지를 받을 때마다 부른다
  * @returns 조종 메시지를 보내는 함수. 연결되기 전에 보낸 메시지는 버린다
  */
 export function connectToGame(
   peerId: string | undefined,
   onStatus: (status: LinkStatus, notice?: string) => void,
+  onText: (text: string) => void,
 ): (text: string) => void {
   if (peerId === undefined) {
     const channel = new BroadcastChannel(HELM_CHANNEL);
+    channel.addEventListener('message', (event: MessageEvent) => {
+      if (typeof event.data === 'string') onText(event.data);
+    });
     // 같은 PC의 탭에는 연결을 맺는 과정이 없으므로, 게임 탭이 열려 있는지와 관계없이 연결된 것으로 표시한다.
     onStatus('connected');
     return (text) => channel.postMessage(text);
@@ -106,6 +118,9 @@ export function connectToGame(
   }, CONNECT_TIMEOUT_MS);
   peer.on('open', () => {
     connection = peer.connect(peerId, CONNECT_OPTIONS);
+    connection.on('data', (data) => {
+      if (typeof data === 'string') onText(data);
+    });
     connection.on('open', () => {
       window.clearTimeout(timeout);
       onStatus('connected');

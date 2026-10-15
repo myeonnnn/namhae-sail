@@ -7,37 +7,59 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>Namhae Sail 컨트롤러</title>
-    <meta name="theme-color" content="#0b1a2a" />
+    <meta name="theme-color" content="#0d1117" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
     <main class="pad">
       <section class="left">
-        <div id="status" class="status" data-status="connecting">연결 중</div>
-        <p id="link-notice" class="notice" hidden></p>
-        <button id="zero" type="button">영점</button>
-        <button id="neutral" type="button">중립</button>
+        <div class="link">
+          <div id="status" class="status" data-status="connecting">연결 중</div>
+          <p id="link-notice" class="notice" hidden></p>
+        </div>
+        <button id="reset" class="action reset" type="button" aria-label="복구">
+          <span class="glyph" aria-hidden="true">↻</span>
+          <span class="caption">복구</span>
+        </button>
       </section>
+
       <section class="center">
-        <div class="label">타 <output id="rudder-value">0%</output></div>
-        <div class="wheel" aria-hidden="true"><div id="wheel-spoke" class="spoke"></div></div>
-        <div class="rudder-bar" aria-hidden="true"><div id="rudder-fill" class="fill"></div></div>
-        <button id="enable-tilt" type="button" hidden>기울기 사용</button>
+        <div class="readout">
+          <span class="readout-label">타</span>
+          <output id="rudder-value">0%</output>
+        </div>
+        <div class="wheel" aria-hidden="true">
+          <div id="wheel-rim" class="wheel-rim">
+            <div class="spoke horizontal"></div>
+            <div class="spoke vertical"></div>
+            <div class="hub"></div>
+            <div class="marker"></div>
+          </div>
+        </div>
+        <div class="rudder-bar" aria-hidden="true">
+          <div id="rudder-fill" class="fill"></div>
+        </div>
+        <button id="enable-tilt" class="enable-tilt" type="button" hidden>기울기 사용</button>
         <p id="tilt-hint" class="hint">핸드폰을 핸들처럼 돌려서 조타합니다.</p>
+        <button id="neutral" class="neutral" type="button">중립</button>
       </section>
+
       <section class="right">
-        <div class="label">스로틀 <output id="throttle-value">0%</output></div>
-        <div
-          id="throttle"
-          class="track"
-          role="slider"
-          aria-label="스로틀"
-          aria-valuemin="-100"
-          aria-valuemax="100"
-          aria-valuenow="0"
-        >
-          <div class="center-line"></div>
-          <div class="thumb"></div>
+        <div class="throttle-buttons">
+          <button id="throttle-up" class="action throttle-up" type="button" aria-label="스로틀 올림">
+            <span class="glyph" aria-hidden="true">▲</span>
+          </button>
+          <div class="readout">
+            <span class="readout-label">스로틀</span>
+            <output id="throttle-value">—</output>
+          </div>
+          <button id="throttle-down" class="action throttle-down" type="button" aria-label="스로틀 내림">
+            <span class="glyph" aria-hidden="true">▼</span>
+          </button>
+        </div>
+        <div class="gauge" aria-hidden="true">
+          <div class="gauge-center"></div>
+          <div id="gauge-fill" class="gauge-fill"></div>
         </div>
       </section>
     </main>

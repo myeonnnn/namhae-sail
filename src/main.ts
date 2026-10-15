@@ -1,6 +1,6 @@
 import './style.css';
 import { HelmHost } from './controller/link';
-import { decodeHelm } from './controller/protocol';
+import { decodeHelm, encodeShipStatus, isNewPress } from './controller/protocol';
 import { chooseHelm, isHelmKeyDown, keyboardHelm, type RemoteHelm } from './core/helm';
 import { Input } from './core/input';
 import { Observer } from './core/observer';
@@ -281,10 +281,21 @@ window.setTimeout(() => startScreen.markReady(), 15000);
 // 컨트롤러가 보낸 마지막 조종 값. 받은 시각을 함께 두어, 메시지가 끊기면 키보드로 돌아간다.
 // 형식이 맞지 않는 메시지는 버리고 직전 값을 그대로 둔다.
 let remoteHelm: RemoteHelm | undefined;
+// 중립과 복구는 누른 횟수로 오므로, 직전 횟수와 비교해서 새로 누른 것만 다음 단계에 한 번 반영한다.
+let pressCounts: { neutral?: number; reset?: number } = {};
+let remoteNeutral = false;
+let remoteReset = false;
 const helmHost = new HelmHost((text) => {
   const message = decodeHelm(text);
-  if (message) remoteHelm = { ...message, receivedAt: performance.now() / 1000 };
+  if (!message) return;
+  if (isNewPress(pressCounts.neutral, message.neutralCount)) remoteNeutral = true;
+  if (isNewPress(pressCounts.reset, message.resetCount)) remoteReset = true;
+  pressCounts = { neutral: message.neutralCount, reset: message.resetCount };
+  remoteHelm = { throttleRate: message.throttleRate, rudder: message.rudder, receivedAt: performance.now() / 1000 };
 });
+// 컨트롤러는 레버를 미는 방향만 보내므로, 스로틀이 지금 몇 %인지는 게임이 알려 준다.
+const STATUS_INTERVAL = 0.1;
+let statusSentAt = -Infinity;
 const phonePanel = new PhonePanel();
 hud.setMenuContent('phone', phonePanel.element, () =>
   helmHost.open((status, peerId) => phonePanel.setStatus(status, peerId)),
@@ -306,7 +317,11 @@ startLoop({
     }
     stepStart.x = ship.state.x;
     stepStart.z = ship.state.z;
-    const helm = chooseHelm(keyboardHelm(input), isHelmKeyDown(input), remoteHelm, performance.now() / 1000);
+    let helm = chooseHelm(keyboardHelm(input), isHelmKeyDown(input), remoteHelm, performance.now() / 1000);
+    if (remoteNeutral) {
+      helm = { ...helm, neutral: true };
+      remoteNeutral = false;
+    }
     ship.update(dt, helm, windVelocity(wind));
     // 충돌을 처리하면 속도가 0이 되므로, 연출에 사용할 속력을 먼저 기록한다.
     const { surge, sway } = ship.state;
@@ -326,9 +341,16 @@ startLoop({
     // 시작 화면이 떠 있는 동안에는 자료를 불러오느라 프레임이 느리므로, 항해를 시작한 뒤부터 해상도를 조절한다.
     if (startScreen.dismissed) stage.adaptResolution(frameTime);
     if (input.isDown('KeyC')) chaseCamera.resetView();
-    if (ship.capsized && input.consumePress('KeyR')) {
+    // 복구 버튼은 항상 보이지만 R 키와 같이 전복되었을 때만 동작한다. 전복되지 않았을 때 누른 것은 버린다.
+    const resetPressed = remoteReset;
+    remoteReset = false;
+    if (ship.capsized && (resetPressed || input.consumePress('KeyR'))) {
       if (timeAttack.active) timeAttack.respawn();
       else placeShip(restart.x, restart.z, restart.heading);
+    }
+    if (elapsed - statusSentAt >= STATUS_INTERVAL) {
+      statusSentAt = elapsed;
+      helmHost.send(encodeShipStatus({ throttle: ship.controls.throttle, capsized: ship.capsized }));
     }
     if (DEV_TOOLS) {
       if (input.consumePress('KeyF')) setObserver(!observer.active);

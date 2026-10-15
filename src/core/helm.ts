@@ -12,8 +12,6 @@ export interface HelmCommand {
   neutral: boolean;
   /** 타가 향할 목표 위치 (-1~1). 양수가 우현이다. */
   rudder: number;
-  /** 있으면 스로틀을 이 값(-1~1)으로 바로 둔다. 핸드폰의 슬라이더처럼 위치가 곧 값인 장치가 쓴다. */
-  throttle?: number;
 }
 
 /** 조종 장치를 따라 레버와 타가 움직이는 빠르기 (ShipSpec의 controls) */
@@ -26,7 +24,9 @@ export interface HelmRates {
 
 /** 컨트롤러가 마지막으로 보낸 명령과, 그 명령을 받은 시각 (초) */
 export interface RemoteHelm {
-  throttle: number;
+  /** 스로틀 레버를 미는 방향 (-1~1) */
+  throttleRate: number;
+  /** 타가 향할 목표 위치 (-1~1) */
   rudder: number;
   receivedAt: number;
 }
@@ -52,17 +52,13 @@ export function isHelmKeyDown(input: Input): boolean {
 
 /**
  * 조타 명령을 따라 dt초 동안 스로틀과 타를 움직인다.
- * - throttle이 있으면 스로틀을 그 값(-1~1로 제한)으로 바로 둔다.
- * - 없으면 스로틀을 throttleRate × rates.throttleRate × dt만큼 움직이고 -1~1로 제한한다.
+ * - 스로틀을 throttleRate × rates.throttleRate × dt만큼 움직이고 -1~1로 제한한다.
  * - neutral이면 스로틀을 0으로 둔다.
  * - 타는 helm.rudder를 향해 최대 rates.rudderRate × dt만큼 움직인다.
  */
 export function applyHelm(controls: ShipControls, helm: HelmCommand, rates: HelmRates, dt: number): void {
-  // 스로틀은 레버처럼 놓은 위치에 머무른다. 슬라이더처럼 위치가 곧 값인 장치는 레버를 그 위치로 바로 옮긴다.
-  controls.throttle =
-    helm.throttle !== undefined
-      ? clamp(helm.throttle)
-      : clamp(controls.throttle + helm.throttleRate * rates.throttleRate * dt);
+  // 스로틀은 레버처럼 놓은 위치에 머무른다. 키보드와 핸드폰이 같은 레버를 같은 빠르기로 민다.
+  controls.throttle = clamp(controls.throttle + helm.throttleRate * rates.throttleRate * dt);
   if (helm.neutral) controls.throttle = 0;
 
   // 타는 장치와 무관하게 같은 빠르기로 움직여서, 핸드폰으로 조종해도 배가 키보드보다 급하게 돌지 않는다.
@@ -84,7 +80,9 @@ export function chooseHelm(
 ): HelmCommand {
   // 키를 누르는 것은 사람이 지금 직접 개입한다는 뜻이므로, 핸드폰이 연결되어 있어도 키보드를 따른다.
   if (keyboardActive || !remote || now - remote.receivedAt > REMOTE_TIMEOUT) return keyboard;
-  return { throttleRate: 0, neutral: false, rudder: remote.rudder, throttle: remote.throttle };
+  // 핸드폰도 키보드처럼 레버를 미는 방향만 보내므로, 두 장치가 같은 레버를 이어서 움직인다.
+  // 중립은 누른 횟수로 따로 전해지므로 여기서는 켜지 않는다.
+  return { throttleRate: remote.throttleRate, neutral: false, rudder: remote.rudder };
 }
 
 function clamp(value: number): number {

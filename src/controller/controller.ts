@@ -1,93 +1,97 @@
 import './controller.css';
 import { connectToGame, LINK_STATUS_LABELS } from './link';
 import { peerIdFromUrl } from './pairing';
-import { encodeHelm, type HelmMessage } from './protocol';
+import { decodeShipStatus, encodeHelm, type HelmMessage } from './protocol';
 import { rudderFromRoll, screenRoll } from './tilt';
 
 // 게임은 메시지가 0.5초 끊기면 키보드로 돌아가므로, 그보다 충분히 자주 보낸다.
 const SEND_INTERVAL_MS = 1000 / 30;
 
-const helm: HelmMessage = { throttle: 0, rudder: 0 };
+const helm: HelmMessage = { throttleRate: 0, rudder: 0, neutralCount: 0, resetCount: 0 };
+
+const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
+
+// 길게 누르면 iOS가 띄우는 메뉴와 확대 돋보기를 막는다. 스로틀 버튼은 누르고 있는 것이 기본 동작이다.
+document.addEventListener('contextmenu', (event) => event.preventDefault());
 
 // ---- 스로틀 ----
 
 /**
- * 끌어서 -1~1의 값을 정하는 세로 슬라이더. 위가 +1이고, 손을 떼도 그 위치에 머무른다.
- * 기본 range 입력은 세로로 세우기 어렵고 핸드폰마다 모양이 달라서, 포인터 이벤트로 직접 만든다.
+ * 누르고 있는 동안만 켜지는 버튼. 키보드의 W, S처럼 레버를 미는 방향만 정하고, 레버의 값은 게임이 정한다.
+ * 손가락이 버튼 밖으로 미끄러져도 떼기 전까지는 누른 것으로 본다.
  */
-function bindThrottle(track: HTMLElement, onChange: (value: number) => void): (value: number) => void {
-  const thumb = track.querySelector<HTMLElement>('.thumb')!;
-  let activePointer: number | undefined;
-
-  const set = (value: number) => {
-    thumb.style.setProperty('--pos', String((1 - value) / 2));
-    thumb.classList.toggle('ahead', value > 0);
-    thumb.classList.toggle('astern', value < 0);
-    track.setAttribute('aria-valuenow', String(Math.round(value * 100)));
-    onChange(value);
-  };
-
-  const valueAt = (event: PointerEvent): number => {
-    const rect = track.getBoundingClientRect();
-    // 손잡이의 가운데가 손가락 아래에 오도록, 손잡이의 크기만큼 움직일 수 있는 범위를 줄인다.
-    const thumbSize = thumb.offsetHeight;
-    const t = (event.clientY - rect.top - thumbSize / 2) / (rect.height - thumbSize);
-    return 1 - 2 * Math.min(1, Math.max(0, t));
-  };
-
-  track.addEventListener('pointerdown', (event) => {
-    if (activePointer !== undefined) return;
-    activePointer = event.pointerId;
-    track.setPointerCapture(event.pointerId);
-    set(valueAt(event));
-  });
-  track.addEventListener('pointermove', (event) => {
-    if (event.pointerId === activePointer) set(valueAt(event));
+function bindHold(button: HTMLElement, onChange: (held: boolean) => void): void {
+  let pointer: number | undefined;
+  button.addEventListener('pointerdown', (event) => {
+    if (pointer !== undefined) return;
+    pointer = event.pointerId;
+    button.setPointerCapture(event.pointerId);
+    button.classList.add('pressed');
+    onChange(true);
   });
   const release = (event: PointerEvent) => {
-    if (event.pointerId === activePointer) activePointer = undefined;
+    if (event.pointerId !== pointer) return;
+    pointer = undefined;
+    button.classList.remove('pressed');
+    onChange(false);
   };
-  track.addEventListener('pointerup', release);
-  track.addEventListener('pointercancel', release);
-
-  set(0);
-  return set;
+  button.addEventListener('pointerup', release);
+  button.addEventListener('pointercancel', release);
+  button.addEventListener('lostpointercapture', release);
 }
 
-const throttleValue = document.querySelector<HTMLOutputElement>('#throttle-value')!;
-const setThrottle = bindThrottle(document.querySelector<HTMLElement>('#throttle')!, (value) => {
-  helm.throttle = value;
-  throttleValue.value = `${Math.round(value * 100)}%`;
+const held = { up: false, down: false };
+const updateThrottleRate = () => (helm.throttleRate = (held.up ? 1 : 0) - (held.down ? 1 : 0));
+bindHold($('#throttle-up'), (value) => {
+  held.up = value;
+  updateThrottleRate();
 });
-document.querySelector<HTMLButtonElement>('#neutral')!.addEventListener('click', () => setThrottle(0));
+bindHold($('#throttle-down'), (value) => {
+  held.down = value;
+  updateThrottleRate();
+});
+
+// 중립과 복구는 누른 횟수를 보낸다. 메시지를 잃어도 다음 메시지에서 늘어난 횟수로 전해진다.
+$('#neutral').addEventListener('click', () => helm.neutralCount++);
+$('#reset').addEventListener('click', () => helm.resetCount++);
+
+const throttleValue = $<HTMLOutputElement>('#throttle-value');
+const gaugeFill = $('#gauge-fill');
+const resetButton = $('#reset');
+
+function showShipStatus(text: string): void {
+  const status = decodeShipStatus(text);
+  if (!status) return;
+  const { throttle, capsized } = status;
+  const percent = Math.round(Math.abs(throttle) * 100);
+  throttleValue.value = percent === 0 ? '중립' : `${throttle > 0 ? '전진' : '후진'} ${percent}%`;
+  // 눈금은 가운데에서 위(전진)나 아래(후진)로 채운다.
+  gaugeFill.style.top = `${50 - Math.max(0, throttle) * 50}%`;
+  gaugeFill.style.height = `${Math.abs(throttle) * 50}%`;
+  gaugeFill.style.background = throttle >= 0 ? 'var(--ahead)' : 'var(--astern)';
+  resetButton.classList.toggle('alert', capsized);
+}
 
 // ---- 기울기 조타 ----
 
-const rudderValue = document.querySelector<HTMLOutputElement>('#rudder-value')!;
-const rudderFill = document.querySelector<HTMLElement>('#rudder-fill')!;
-const wheelSpoke = document.querySelector<HTMLElement>('#wheel-spoke')!;
-const enableTilt = document.querySelector<HTMLButtonElement>('#enable-tilt')!;
-const tiltHint = document.querySelector<HTMLElement>('#tilt-hint')!;
-
-let roll = 0;
-let zero = 0;
-
-function showRudder(): void {
-  const rudder = helm.rudder;
-  rudderValue.value = `${rudder > 0 ? '우현' : rudder < 0 ? '좌현' : ''} ${Math.round(Math.abs(rudder) * 100)}%`.trim();
-  // 막대는 가운데에서 돌린 쪽으로 채운다.
-  rudderFill.style.left = `${50 + Math.min(0, rudder) * 50}%`;
-  rudderFill.style.width = `${Math.abs(rudder) * 50}%`;
-  rudderFill.style.background = rudder >= 0 ? 'var(--starboard)' : 'var(--port)';
-  wheelSpoke.style.setProperty('--roll', `${roll - zero}deg`);
-}
+const rudderValue = $<HTMLOutputElement>('#rudder-value');
+const rudderFill = $('#rudder-fill');
+const wheelRim = $('#wheel-rim');
+const enableTilt = $<HTMLButtonElement>('#enable-tilt');
+const tiltHint = $('#tilt-hint');
 
 function onMotion(event: DeviceMotionEvent): void {
   const gravity = event.accelerationIncludingGravity;
   if (gravity?.x == null || gravity.y == null) return;
-  roll = screenRoll({ x: gravity.x, y: gravity.y }, screenAngle());
-  helm.rudder = rudderFromRoll(roll, zero);
-  showRudder();
+  const roll = screenRoll({ x: gravity.x, y: gravity.y }, screenAngle());
+  helm.rudder = rudderFromRoll(roll);
+  const percent = Math.round(Math.abs(helm.rudder) * 100);
+  rudderValue.value = percent === 0 ? '0%' : `${helm.rudder > 0 ? '우현' : '좌현'} ${percent}%`;
+  // 막대는 가운데에서 돌린 쪽으로 채우고, 핸들은 돌린 각도만큼 함께 돌려 보여 준다.
+  rudderFill.style.left = `${50 + Math.min(0, helm.rudder) * 50}%`;
+  rudderFill.style.width = `${Math.abs(helm.rudder) * 50}%`;
+  rudderFill.style.background = helm.rudder >= 0 ? 'var(--starboard)' : 'var(--port)';
+  wheelRim.style.setProperty('--roll', `${roll}deg`);
 }
 
 /** 화면이 돌아간 각도. 아이폰의 오래된 Safari에는 screen.orientation이 없어서 window.orientation을 쓴다. */
@@ -100,6 +104,7 @@ function screenAngle(): number {
 function startTilt(): void {
   window.addEventListener('devicemotion', onMotion);
   enableTilt.hidden = true;
+  tiltHint.hidden = true;
 }
 
 // 아이폰은 사용자가 버튼을 눌렀을 때만 센서 권한을 물을 수 있고, HTTPS 페이지에서만 센서 값을 준다.
@@ -121,25 +126,21 @@ if (!window.isSecureContext) {
   startTilt();
 }
 
-// 영점 버튼을 누르면 지금 쥐고 있는 각도를 가운데로 삼는다. 비스듬히 쥐어도 편한 자세에서 조타할 수 있다.
-document.querySelector<HTMLButtonElement>('#zero')!.addEventListener('click', () => {
-  zero = roll;
-  helm.rudder = rudderFromRoll(roll, zero);
-  showRudder();
-});
-showRudder();
-
-// ---- 전송 ----
+// ---- 연결 ----
 
 // 주소에 게임 ID가 있으면 QR 코드로 연 핸드폰이므로 그 게임에 연결하고, 없으면 같은 PC의 게임 탭에 보낸다.
-const statusElement = document.querySelector<HTMLElement>('#status')!;
-const linkNotice = document.querySelector<HTMLElement>('#link-notice')!;
-const send = connectToGame(peerIdFromUrl(location.href), (status, notice) => {
-  statusElement.dataset.status = status;
-  statusElement.textContent = LINK_STATUS_LABELS[status];
-  linkNotice.textContent = notice ?? '';
-  linkNotice.hidden = !notice;
-});
+const statusElement = $('#status');
+const linkNotice = $('#link-notice');
+const send = connectToGame(
+  peerIdFromUrl(location.href),
+  (status, notice) => {
+    statusElement.dataset.status = status;
+    statusElement.textContent = LINK_STATUS_LABELS[status];
+    linkNotice.textContent = notice ?? '';
+    linkNotice.hidden = !notice;
+  },
+  showShipStatus,
+);
 
 // 값이 바뀔 때만 보내지 않고 계속 보낸다. 게임은 메시지가 계속 오는 것으로 컨트롤러가 살아 있다고 판단한다.
 window.setInterval(() => send(encodeHelm(helm)), SEND_INTERVAL_MS);

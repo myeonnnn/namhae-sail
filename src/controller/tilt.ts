@@ -27,12 +27,11 @@ export function screenRoll(gravity: Gravity, screenAngle: number): number {
 }
 
 /**
- * 핸드폰을 돌린 각도를 타의 위치(-1~1)로 바꾼다.
+ * 핸드폰을 돌린 각도를 타의 위치(-1~1)로 바꾼다. 화면이 수평인 자세(0도)가 타의 가운데이다.
  * @param roll screenRoll이 구한 지금의 각도(도)
- * @param zero 영점의 각도(도). 영점 버튼을 누를 때의 roll이고, 처음에는 0이다
  */
-export function rudderFromRoll(roll: number, zero: number): number {
-  const angle = wrapHalfTurn(roll - zero);
+export function rudderFromRoll(roll: number): number {
+  const angle = wrapHalfTurn(roll);
   // 데드존을 뺀 나머지 각도로 비례시켜서, 데드존을 넘는 순간 타가 0에서부터 이어서 움직이게 한다.
   const beyond = Math.abs(angle) - DEAD_ZONE;
   if (beyond <= 0) return 0;
