@@ -38,6 +38,12 @@ function vitest(extraArgs) {
   return spawnSync(VITEST, extraArgs, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 function listTestFiles(directory) {
   return readdirSync(join(ROOT, directory), { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -76,9 +82,10 @@ function runSuite() {
   ]);
 }
 
-// 2, 3. 실행 시간과 불안정한 테스트: 전체를 여러 번 돌려서, 가장 오래 걸린 시간과 실행마다의 결과를 모은다.
+// 2, 3. 실행 시간과 불안정한 테스트: 전체를 여러 번 돌려서, 파일마다 걸린 시간과 실행마다의 결과를 모은다.
+// 세 묶음이 병렬로 돌아서 한 번의 시간은 기기의 부하에 따라 흔들린다. 그래서 최댓값이 아니라 중앙값으로 판정한다.
 {
-  const slowest = new Map();
+  const durations = new Map();
   const outcomes = [];
   let allPassed = true;
   for (let run = 0; run < runs; run++) {
@@ -87,18 +94,18 @@ function runSuite() {
     const outcome = {};
     for (const file of result.testResults) {
       const path = relative(ROOT, file.name);
-      slowest.set(path, Math.max(slowest.get(path) ?? 0, file.endTime - file.startTime));
+      durations.set(path, [...(durations.get(path) ?? []), file.endTime - file.startTime]);
       for (const test of file.assertionResults) outcome[`${path} > ${test.fullName}`] = test.status;
     }
     outcomes.push(outcome);
   }
   const slow = findSlowFiles(
-    [...slowest].map(([file, durationMs]) => ({ file, durationMs })),
+    [...durations].map(([file, times]) => ({ file, durationMs: median(times) })),
     BUDGETS,
   );
   report(
     slow.length === 0,
-    `실행 시간: 파일별 한도 ${JSON.stringify(BUDGETS)} (ms), ${runs}회 가운데 가장 느린 값`,
+    `실행 시간: 파일별 한도 ${JSON.stringify(BUDGETS)} (ms), ${runs}회의 중앙값`,
     slow.map((s) => `${s.file}: ${Math.round(s.durationMs)}ms (한도 ${s.budgetMs}ms)`),
   );
   const flaky = findFlakyTests(outcomes);
