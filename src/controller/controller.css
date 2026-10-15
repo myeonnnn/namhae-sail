@@ -5,6 +5,8 @@
   --muted: rgba(232, 241, 248, 0.62);
   --ahead: #7fd0ff;
   --astern: #ffb45c;
+  --port: #ff6b6b;
+  --starboard: #5fd38a;
   --font: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
 }
 
@@ -23,17 +25,52 @@ body {
   -webkit-touch-callout: none;
 }
 
+/* 가로로 쥐었을 때 왼손 엄지는 버튼을, 오른손 엄지는 스로틀을 맡고, 가운데에는 타의 위치를 보여 준다. */
 .pad {
   box-sizing: border-box;
   height: 100%;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.4fr) minmax(110px, 0.8fr);
+  gap: 16px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+section {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  min-height: 0;
+}
+
+.left {
+  gap: 12px;
+}
+
+.center {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.center .label {
+  font-size: 18px;
+}
+
+.label output {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .status {
-  align-self: center;
+  align-self: flex-start;
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -42,97 +79,120 @@ body {
 }
 
 .status[data-status='connected'] {
-  color: #5fd38a;
+  color: var(--starboard);
   border-color: rgba(95, 211, 138, 0.5);
 }
 
 .status[data-status='disconnected'] {
-  color: #ff6b6b;
+  color: var(--port);
   border-color: rgba(255, 107, 107, 0.5);
 }
 
-.label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 15px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.label output {
+button {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
-  font-variant-numeric: tabular-nums;
+  font: 600 18px var(--font);
 }
 
-/* 스로틀은 화면의 대부분을 차지해서, 엄지를 크게 움직여 세밀하게 맞출 수 있게 한다. */
-.throttle {
+button:active {
+  background: rgba(232, 241, 248, 0.2);
+}
+
+#zero,
+#neutral {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  min-height: 56px;
+}
+
+#enable-tilt {
+  padding: 14px 24px;
+  background: var(--ahead);
+  color: #0b1a2a;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* 핸드폰을 돌린 정도를 핸들의 살로 보여 준다. 영점에서 30도를 돌리면 타가 끝까지 간다. */
+.wheel {
+  width: min(40vh, 160px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 6px solid var(--border);
+  display: grid;
+  place-items: center;
+}
+
+.spoke {
+  width: 100%;
+  height: 6px;
+  background: var(--text);
+  border-radius: 3px;
+  transform: rotate(var(--roll, 0deg));
+}
+
+.rudder-bar {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.rudder-bar .fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 5px;
+}
+
+.rudder-bar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--border);
+}
+
+.right {
+  gap: 8px;
 }
 
 .track {
   position: relative;
+  flex: 1;
   border-radius: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
 }
 
-.track.vertical {
-  flex: 1;
-  width: min(140px, 40vw);
-  align-self: center;
-}
-
-.track.horizontal {
-  height: 96px;
-}
-
 .center-line {
   position: absolute;
-  background: var(--border);
-}
-
-.vertical .center-line {
   left: 12px;
   right: 12px;
   top: 50%;
   height: 2px;
-}
-
-.horizontal .center-line {
-  top: 12px;
-  bottom: 12px;
-  left: 50%;
-  width: 2px;
+  background: var(--border);
 }
 
 .thumb {
   position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 56px;
+  top: calc(var(--pos, 0.5) * (100% - 56px));
   border-radius: 14px;
   background: var(--text);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
   pointer-events: none;
-}
-
-.vertical .thumb {
-  left: 8px;
-  right: 8px;
-  height: 64px;
-  top: calc(var(--pos, 0.5) * (100% - 64px));
-}
-
-.horizontal .thumb {
-  top: 8px;
-  bottom: 8px;
-  width: 64px;
-  left: calc(var(--pos, 0.5) * (100% - 64px));
-}
-
-/* 손을 떼면 가운데로 돌아오는 움직임이 보이도록, 끄는 중이 아닐 때만 애니메이션을 준다. */
-.horizontal:not(.dragging) .thumb {
-  transition: left 0.15s ease-out;
 }
 
 .thumb.ahead {
@@ -143,16 +203,20 @@ body {
   background: var(--astern);
 }
 
-#neutral {
-  margin-top: 12px;
-  height: 64px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font: 600 18px var(--font);
+.rotate-notice {
+  display: none;
 }
 
-#neutral:active {
-  background: rgba(232, 241, 248, 0.2);
+/* 세로로 들면 조종할 수 없게 덮고, 가로로 돌려 달라고 안내한다. */
+@media (orientation: portrait) {
+  .rotate-notice {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: #0b1a2a;
+    font-size: 20px;
+    text-align: center;
+  }
 }

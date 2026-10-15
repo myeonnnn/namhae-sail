@@ -5,7 +5,8 @@
       "name": "namhae-sail",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
-      "port": 5190
+      "port": 5190,
+      "url": "https://localhost:5190"
     }
   ]
 }
