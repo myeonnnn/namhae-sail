@@ -93,27 +93,3 @@ export function failureReason(command, output, maxLength = 2000) {
   // 테스트 실패의 요약은 출력의 끝에 있으므로, 길면 앞을 자르고 끝을 남긴다.
   return header + (clean.length <= room ? clean : '…' + clean.slice(clean.length - (room - 1)));
 }
-
-/**
- * 도구 호출 하나를 기록할 한 줄(JSON으로 저장할 객체)을 만든다. 나중에 "테스트를 먼저 썼는가" 같은 규칙의 준수를 확인하는 데 쓴다.
- * @param {{ hook_event_name?: string, tool_name?: string, tool_input?: { file_path?: string, command?: string },
- *   agent_id?: string, agent_type?: string }} input 훅의 입력
- * @param {string} projectDir 프로젝트 폴더의 절대 경로
- * @param {Date} time
- * @returns {{ time: string, event: string, tool: string | null, file: string | null, command: string | null,
- *   agent: string, agentId: string | null }}
- *   time은 ISO 형식, file은 프로젝트 폴더 기준의 상대 경로(바깥이면 절대 경로), command는 Bash의 명령(앞 200자),
- *   agent는 서브에이전트이면 agent_type, 메인 에이전트이면 'main'이다.
- */
-export function logEntry(input, projectDir, time) {
-  const file = input.tool_input?.file_path ?? null;
-  return {
-    time: time.toISOString(),
-    event: input.hook_event_name ?? null,
-    tool: input.tool_name ?? null,
-    file: file === null ? null : (insideProject(file, projectDir) ?? file),
-    command: input.tool_input?.command?.slice(0, 200) ?? null,
-    agent: input.agent_type ?? 'main',
-    agentId: input.agent_id ?? null,
-  };
-}

@@ -74,64 +74,6 @@ describe('테스트 파일 보호 훅 (guard-tests.mjs)', () => {
   });
 });
 
-describe('도구 호출 기록 훅 (log.mjs)', () => {
-  it('호출마다 기록 파일에 JSON 한 줄을 덧붙이고, 없는 폴더는 만들며, 종료 코드는 0이다', async () => {
-    const logFile = join(tmp, 'logs', 'nested', 'tools.jsonl');
-    const env = { CLAUDE_PROJECT_DIR: tmp, HARNESS_LOG_FILE: logFile };
-
-    const first = await runHook(
-      'log.mjs',
-      { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: join(tmp, 'src/sim/race.ts') } },
-      env,
-    );
-    const second = await runHook(
-      'log.mjs',
-      {
-        hook_event_name: 'PostToolUse',
-        tool_name: 'Bash',
-        tool_input: { command: 'pnpm test' },
-        agent_id: 'agent-7',
-        agent_type: 'test-writer',
-      },
-      env,
-    );
-    expect(first.code).toBe(0);
-    expect(second.code).toBe(0);
-
-    const lines = readFileSync(logFile, 'utf8').trim().split('\n');
-    expect(lines).toHaveLength(2);
-    const [a, b] = lines.map((line) => JSON.parse(line));
-
-    // logEntry가 정한 필드를 가진다.
-    const fields = ['agent', 'agentId', 'command', 'event', 'file', 'time', 'tool'];
-    expect(Object.keys(a).sort()).toEqual(fields);
-    expect(Object.keys(b).sort()).toEqual(fields);
-
-    expect(a).toMatchObject({
-      event: 'PreToolUse',
-      tool: 'Edit',
-      file: 'src/sim/race.ts',
-      command: null,
-      agent: 'main',
-      agentId: null,
-    });
-    expect(b).toMatchObject({
-      event: 'PostToolUse',
-      tool: 'Bash',
-      file: null,
-      command: 'pnpm test',
-      agent: 'test-writer',
-      agentId: 'agent-7',
-    });
-    for (const entry of [a, b]) expect(new Date(entry.time).toISOString()).toBe(entry.time);
-  });
-
-  it('입력이 JSON이 아니어도 종료 코드는 0이다 (기록이 작업을 막아서는 안 된다)', async () => {
-    const env = { CLAUDE_PROJECT_DIR: tmp, HARNESS_LOG_FILE: join(tmp, 'logs', 'broken.jsonl') };
-    expect((await runHook('log.mjs', '{ 이건 JSON이 아니다', env)).code).toBe(0);
-  });
-});
-
 describe('서식 훅 (format.mjs)', () => {
   const env = () => ({ CLAUDE_PROJECT_DIR: tmp });
   const writeInput = (file) => ({

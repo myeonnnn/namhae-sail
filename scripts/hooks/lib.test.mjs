@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TEST_WRITER, decideStopVerification, failureReason, formatTarget, guardTestEdit, logEntry } from './lib.mjs';
+import { TEST_WRITER, decideStopVerification, failureReason, formatTarget, guardTestEdit } from './lib.mjs';
 
 const PROJECT = '/work/namhae-sail';
 const edit = (file_path, tool_name = 'Edit') => ({ tool_name, tool_input: { file_path } });
@@ -164,73 +164,5 @@ describe('실패한 검사의 이유 (failureReason)', () => {
     const reason = failureReason('pnpm test', output, 500);
     expect(reason).not.toContain('\u001b');
     expect(reason.length).toBeLessThanOrEqual(500);
-  });
-});
-
-describe('도구 호출의 기록 (logEntry)', () => {
-  const time = new Date('2026-10-15T01:02:03.004Z');
-
-  it('메인 에이전트의 파일 수정은 프로젝트 기준의 상대 경로와 함께 main으로 기록한다', () => {
-    const input = { hook_event_name: 'PreToolUse', ...edit(`${PROJECT}/src/sim/race.ts`) };
-    expect(logEntry(input, PROJECT, time)).toEqual({
-      time: '2026-10-15T01:02:03.004Z',
-      event: 'PreToolUse',
-      tool: 'Edit',
-      file: 'src/sim/race.ts',
-      command: null,
-      agent: 'main',
-      agentId: null,
-    });
-  });
-
-  it('서브에이전트의 호출은 agent_type과 agent_id로 기록한다', () => {
-    const input = {
-      hook_event_name: 'PostToolUse',
-      ...edit(`${PROJECT}/src/sim/race.test.ts`, 'Write'),
-      agent_id: 'agent-123',
-      agent_type: TEST_WRITER,
-    };
-    const entry = logEntry(input, PROJECT, time);
-    expect(entry.agent).toBe(TEST_WRITER);
-    expect(entry.agentId).toBe('agent-123');
-    expect(entry.file).toBe('src/sim/race.test.ts');
-  });
-
-  it('프로젝트 폴더 바깥의 파일은 절대 경로로 기록한다', () => {
-    const entry = logEntry({ hook_event_name: 'PreToolUse', ...edit('/tmp/other/a.ts') }, PROJECT, time);
-    expect(entry.file).toBe('/tmp/other/a.ts');
-    expect(logEntry({ hook_event_name: 'PreToolUse', ...edit(`${PROJECT}-old/a.ts`) }, PROJECT, time).file).toBe(
-      `${PROJECT}-old/a.ts`,
-    );
-  });
-
-  it('Bash의 명령은 앞 200자만 기록하고, 파일은 null이다', () => {
-    const short = logEntry(
-      { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'pnpm test' } },
-      PROJECT,
-      time,
-    );
-    expect(short.command).toBe('pnpm test');
-    expect(short.file).toBeNull();
-
-    const long = 'a'.repeat(150) + 'b'.repeat(150);
-    const entry = logEntry(
-      { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: long } },
-      PROJECT,
-      time,
-    );
-    expect(entry.command).toBe(long.slice(0, 200));
-  });
-
-  it('도구가 없는 이벤트(예: Stop)는 tool, file, command가 모두 null이다', () => {
-    expect(logEntry({ hook_event_name: 'Stop' }, PROJECT, time)).toEqual({
-      time: '2026-10-15T01:02:03.004Z',
-      event: 'Stop',
-      tool: null,
-      file: null,
-      command: null,
-      agent: 'main',
-      agentId: null,
-    });
   });
 });

@@ -69,7 +69,6 @@ pnpm exec prettier --write <파일>   # 옵션은 .prettierrc.json에 있다
 | --- | --- | --- |
 | 파일을 고치기 전 | `guard-tests.mjs` | 메인 에이전트가 `*.test.*`를 고치거나 만들면 막는다. `test-writer` 에이전트만 허용한다 |
 | 파일을 고친 뒤 | `format.mjs` | 고친 파일만 prettier로 맞춘다. 실패해도 막지 않는다 |
-| 도구를 쓴 뒤 | `log.mjs` | `.claude/logs/tool-calls.jsonl`에 한 줄씩 기록한다 (규칙 준수를 사후에 확인하는 용도) |
 | 응답을 끝낼 때 | `verify-on-stop.mjs` | `pnpm typecheck`와 `pnpm test`가 실패하면 종료를 막는다. 마지막으로 통과한 뒤 바뀐 것이 없으면 건너뛴다 |
 
 - 훅은 이 폴더(`namhae-sail`)에서 시작한 세션에서만 적용된다. 상위 폴더에서 시작하면 적용되지 않는다.

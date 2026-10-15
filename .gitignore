@@ -6,4 +6,3 @@ kenney_watercraft-pack/
 .cache
 .vitest
 .claude/state
-.claude/logs
