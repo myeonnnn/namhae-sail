@@ -1,6 +1,8 @@
-/** 영점에서 이만큼(도) 돌리면 타가 끝까지 간다. */
+/** 수평에서 이만큼(도) 돌리면 타가 끝까지 간다. */
 const FULL_ROLL = 30;
-/** 영점에서 이 각도(도) 안쪽은 손의 떨림으로 보고 0으로 둔다. */
+/** 기울기를 따라가는 시정수(초). 손 떨림(초당 8~12번)은 크게 줄이고, 핸들을 돌리는 느린 동작은 거의 그대로 따라간다. */
+const SMOOTHING_TIME = 0.15;
+/** 수평에서 이 각도(도) 안쪽은 손의 떨림으로 보고 0으로 둔다. */
 const DEAD_ZONE = 3;
 
 /** 가속도 센서가 잰 중력의 방향. DeviceMotionEvent.accelerationIncludingGravity의 x, y와 같다 (m/s²). */
@@ -24,6 +26,20 @@ export function screenRoll(gravity: Gravity, screenAngle: number): number {
   // 화면을 시계 방향으로 돌리면 위쪽은 화면 안에서 반시계 방향으로 돌아가 보인다.
   // 결과를 180도 범위로 접으면, 브라우저마다 다른 센서의 부호와 screenAngle의 90과 270이 뒤바뀐 경우가 모두 같은 각도가 된다.
   return wrapHalfTurn((Math.atan2(-x, y) * 180) / Math.PI);
+}
+
+/**
+ * 센서가 잰 각도를 부드럽게 따라가서, 손의 미세한 떨림을 걸러 낸다.
+ * 시정수 0.15초의 지수 평활이다. 각도가 한 번에 바뀌면 0.15초 뒤에 바뀐 양의 1−1/e(약 63%)를 따라간다.
+ * @param previous 직전에 이 함수가 돌려준 각도(도). 처음이면 undefined이고, 이때는 roll을 그대로 돌려준다
+ * @param roll screenRoll이 구한 지금의 각도(도)
+ * @param dt 직전 값을 받은 뒤로 지난 시간(초)
+ */
+export function smoothRoll(previous: number | undefined, roll: number, dt: number): number {
+  if (previous === undefined) return roll;
+  // 센서 값이 오는 간격은 기기와 부하에 따라 달라지므로, 간격에 맞춘 비율로 따라가야 같은 시간에 같은 만큼 반영된다.
+  const alpha = 1 - Math.exp(-Math.max(0, dt) / SMOOTHING_TIME);
+  return previous + (roll - previous) * alpha;
 }
 
 /**

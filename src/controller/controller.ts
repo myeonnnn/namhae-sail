@@ -2,7 +2,7 @@ import './controller.css';
 import { connectToGame, LINK_STATUS_LABELS } from './link';
 import { peerIdFromUrl } from './pairing';
 import { decodeShipStatus, encodeHelm, type HelmMessage } from './protocol';
-import { rudderFromRoll, screenRoll } from './tilt';
+import { rudderFromRoll, screenRoll, smoothRoll } from './tilt';
 
 // 게임은 메시지가 0.5초 끊기면 키보드로 돌아가므로, 그보다 충분히 자주 보낸다.
 const SEND_INTERVAL_MS = 1000 / 30;
@@ -100,10 +100,18 @@ const wheelRim = $('#wheel-rim');
 const enableTilt = $<HTMLButtonElement>('#enable-tilt');
 const tiltHint = $('#tilt-hint');
 
+// 센서는 손의 미세한 떨림까지 재므로, 각도를 부드럽게 따라간 값으로 타와 화면을 정한다.
+let smoothedRoll: number | undefined;
+let lastMotionAt: number | undefined;
+
 function onMotion(event: DeviceMotionEvent): void {
   const gravity = event.accelerationIncludingGravity;
   if (gravity?.x == null || gravity.y == null) return;
-  const roll = screenRoll({ x: gravity.x, y: gravity.y }, screenAngle());
+  // 앱을 잠시 벗어났다 돌아오면 간격이 길어지므로, 0.5초를 넘으면 그 사이를 따라가지 않고 지금 값에서 다시 시작한다.
+  const dt = lastMotionAt === undefined ? 0 : (event.timeStamp - lastMotionAt) / 1000;
+  lastMotionAt = event.timeStamp;
+  if (dt > 0.5) smoothedRoll = undefined;
+  const roll = (smoothedRoll = smoothRoll(smoothedRoll, screenRoll({ x: gravity.x, y: gravity.y }, screenAngle()), dt));
   helm.rudder = rudderFromRoll(roll);
   const percent = Math.round(Math.abs(helm.rudder) * 100);
   rudderValue.value = percent === 0 ? '0%' : `${helm.rudder > 0 ? '우현' : '좌현'} ${percent}%`;
