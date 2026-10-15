@@ -6,16 +6,24 @@ export default defineConfig({
   test: {
     projects: [
       {
-        // 물리와 수면 계산처럼 숫자만 다루는 테스트는 Node에서 돌린다. 빠르고 브라우저가 필요 없다.
+        // 단위 테스트: 모듈 하나를 Node에서 확인한다. 가장 빠르고, 코드를 고칠 때마다 돌린다.
         test: {
           name: 'unit',
           environment: 'node',
           include: ['src/**/*.test.ts'],
-          exclude: ['src/**/*.browser.test.ts'],
+          exclude: ['src/**/*.integration.test.ts', 'src/**/*.browser.test.ts'],
         },
       },
       {
-        // 셰이더처럼 WebGL이 필요한 테스트는 실제 브라우저 안에서 돌린다.
+        // 통합 테스트: 여러 모듈을 실제로 엮어서 하나의 흐름을 Node에서 확인한다 (예: 수면 → 선체가 받는 힘 → 횡동요 → 전복).
+        test: {
+          name: 'integration',
+          environment: 'node',
+          include: ['src/**/*.integration.test.ts'],
+        },
+      },
+      {
+        // 브라우저 테스트: 셰이더처럼 WebGL이 필요한 것을 실제 브라우저 안에서 확인한다.
         // Playwright가 브라우저를 따로 내려받지 않도록, 이 컴퓨터에 설치된 Chrome을 쓴다.
         // 헤드리스 Chrome은 기본으로 GPU를 쓰지 않으므로, 실제 화면과 같은 조건이 되도록 GPU를 켠다.
         test: {
