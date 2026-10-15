@@ -32,7 +32,7 @@ export class PhonePanel {
       const warning = document.createElement('p');
       warning.className = 'hud-phone-warning';
       warning.textContent =
-        '지금 주소(localhost)로는 핸드폰이 접속할 수 없습니다. 개발 서버가 알려 주는 Network 주소로 게임을 여세요.';
+        '지금 주소(localhost)로는 핸드폰이 접속할 수 없습니다. 개발 서버를 pnpm dev:lan으로 다시 여세요.';
       this.element.append(warning);
       if (import.meta.env.DEV) void this.useLanAddress(warning);
     }

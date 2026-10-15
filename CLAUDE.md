@@ -7,6 +7,7 @@
 
 ```bash
 pnpm dev          # 개발 서버, 포트 5190 고정. 상위 폴더 .claude/launch.json의 namhae-sail로 띄운다
+pnpm dev:lan      # 같은 와이파이의 핸드폰으로 컨트롤러를 시험할 때만 쓴다. 개발 서버를 LAN에 연다
 pnpm typecheck
 pnpm test         # 단위, 통합, 브라우저 테스트를 모두 실행
 pnpm vitest run --project unit          # 단위만 (가장 빠름)

@@ -2,8 +2,9 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig, type Plugin } from 'vite';
 
 export default defineConfig({
-  // 같은 와이파이의 핸드폰이 QR 코드로 컨트롤러를 열 수 있도록, 개발 서버를 LAN에도 연다.
-  server: { port: 5190, strictPort: true, host: true },
+  // 개발 서버는 기본으로 이 PC에서만 열어서, 같은 와이파이의 다른 기기가 소스에 접근하지 못하게 한다.
+  // 핸드폰 컨트롤러를 시험할 때만 pnpm dev:lan으로 LAN에 연다.
+  server: { port: 5190, strictPort: true },
   // 아이폰은 HTTPS 페이지에서만 기울기 센서를 허용하므로, 개발 서버도 자체 서명 인증서로 HTTPS를 쓴다.
   plugins: [basicSsl(), lanUrl()],
   build: {
