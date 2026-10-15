@@ -125,6 +125,7 @@ function startTilt(): void {
   window.addEventListener('devicemotion', onMotion);
   enableTilt.hidden = true;
   tiltHint.hidden = true;
+  document.body.classList.remove('tilt-off');
 }
 
 // 아이폰은 사용자가 버튼을 눌렀을 때만 센서 권한을 물을 수 있고, HTTPS 페이지에서만 센서 값을 준다.
@@ -133,7 +134,10 @@ const motion = (window as { DeviceMotionEvent?: MotionWithPermission }).DeviceMo
 if (!window.isSecureContext) {
   tiltHint.textContent = 'HTTPS 주소에서만 기울기를 쓸 수 있습니다.';
 } else if (motion?.requestPermission) {
+  // 처음 연 사람은 무엇을 눌러야 할지 모르므로, 권한을 받기 전까지 버튼이 숨 쉬듯 커지고 핸들이 좌우로 흔들린다.
   enableTilt.hidden = false;
+  document.body.classList.add('tilt-off');
+  tiltHint.textContent = '버튼을 누르면 핸드폰을 핸들처럼 돌려서 조타합니다.';
   enableTilt.addEventListener('click', () => {
     motion.requestPermission!()
       .then((state) => {

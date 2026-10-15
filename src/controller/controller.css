@@ -319,11 +319,73 @@ button {
 }
 
 .enable-tilt {
-  padding: 10px 22px;
+  position: relative;
+  padding: 12px 28px;
   border-radius: 999px;
   border: none;
   background: var(--ahead);
   color: #04121d;
+  font-size: 17px;
+  box-shadow: 0 4px 0 #1b5f8f;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+/* 버튼 둘레로 퍼지는 고리. 눌러야 할 곳이 여기라는 것을 알린다. */
+.enable-tilt::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 2px solid var(--ahead);
+  animation: ripple 1.6s ease-out infinite;
+  pointer-events: none;
+}
+
+.enable-tilt:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1b5f8f;
+  animation: none;
+}
+
+@keyframes breathe {
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35, 1.7);
+  }
+}
+
+/* 기울기를 켜기 전에는 핸들이 좌우로 흔들려서, 핸드폰을 돌리는 조작이라는 것을 보여 준다. */
+body.tilt-off .wheel-rim {
+  animation: rock 2.4s ease-in-out infinite;
+}
+
+@keyframes rock {
+  0%,
+  100% {
+    transform: rotate(-16deg);
+  }
+  50% {
+    transform: rotate(16deg);
+  }
+}
+
+/* 움직임을 줄이도록 설정한 사람에게는 애니메이션을 보이지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  .enable-tilt,
+  .enable-tilt::before,
+  body.tilt-off .wheel-rim {
+    animation: none;
+  }
 }
 
 /* 다른 버튼과 같은 모양(.action)을 쓰고, 모서리도 스로틀 버튼과 맞춘다. */
