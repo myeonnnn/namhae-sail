@@ -21,8 +21,11 @@ function courseThrough(points: Point[]): Course {
     seaLevel: 1,
     windFromDeg: 0,
     gateWidth: 40,
-    precision: 1,
-    sea: 1,
+    // 경로를 재거나 경주를 진행하는 데는 난이도가 쓰이지 않으므로 가장 낮은 값으로 둔다.
+    seaScore: 1,
+    risks: { corners: 0, beamLegs: 0 },
+    riskScore: 1,
+    difficulty: 'easy',
     start: { x: start.x, z: start.z, heading: 0 },
     gates: rest.map((p, i) => ({
       x: p.x,

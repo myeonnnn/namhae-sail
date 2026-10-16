@@ -7,8 +7,6 @@
     "seaLevel": 4,
     "windFromDeg": 225,
     "gateWidth": 90,
-    "precision": 1,
-    "sea": 2,
     "start": {
       "lat": 34.714,
       "lon": 128.364
@@ -48,8 +46,6 @@
     "seaLevel": 4,
     "windFromDeg": 160,
     "gateWidth": 100,
-    "precision": 1,
-    "sea": 2,
     "start": {
       "lat": 34.7928,
       "lon": 128.4497
@@ -85,8 +81,6 @@
     "seaLevel": 4,
     "windFromDeg": 200,
     "gateWidth": 80,
-    "precision": 2,
-    "sea": 2,
     "start": {
       "lat": 34.8748,
       "lon": 128.4704
@@ -122,8 +116,6 @@
     "seaLevel": 4,
     "windFromDeg": 270,
     "gateWidth": 70,
-    "precision": 2,
-    "sea": 2,
     "start": {
       "lat": 34.8396,
       "lon": 128.2152
@@ -163,8 +155,6 @@
     "seaLevel": 4,
     "windFromDeg": 190,
     "gateWidth": 100,
-    "precision": 1,
-    "sea": 3,
     "start": {
       "lat": 34.659,
       "lon": 128.244
@@ -200,8 +190,6 @@
     "seaLevel": 4,
     "windFromDeg": 0,
     "gateWidth": 40,
-    "precision": 3,
-    "sea": 2,
     "start": {
       "lat": 34.8358,
       "lon": 128.4195

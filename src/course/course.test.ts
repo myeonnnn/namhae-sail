@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { latLonToWorld } from '../geo/projection';
 import { COURSES, DIFFICULTY_LABELS, difficultyOf } from './course';
+import definitions from './courses.json';
+import { countRisks, riskScoreOf, riskyChoices, seaScoreOf } from './risk';
 
 // 명세 "난이도" 절의 값. 구현의 상수를 가져오지 않고 여기에 따로 적는다.
-/** 정밀함과 바다의 거칠기가 가질 수 있는 값: 1(낮음), 2(중간), 3(높음) */
+/** 바다의 세기와 위험한 선택이 가질 수 있는 값: 1(낮음), 2(중간), 3(높음) */
 const LEVELS = [1, 2, 3];
 
 /**
@@ -29,13 +31,13 @@ const MIREUK = {
 };
 
 describe('코스의 등급', () => {
-  it('정밀함과 바다의 거칠기의 합이 3 이하이면 쉬움, 4이면 보통, 5 이상이면 어려움이다', () => {
+  it('바다의 세기와 위험한 선택의 합이 3 이하이면 쉬움, 4이면 보통, 5 이상이면 어려움이다', () => {
     // 1~3의 모든 조합 아홉 가지를 합으로 직접 판정해서 비교한다.
-    for (const precision of LEVELS) {
-      for (const sea of LEVELS) {
-        const sum = precision + sea;
+    for (const seaScore of LEVELS) {
+      for (const riskScore of LEVELS) {
+        const sum = seaScore + riskScore;
         const expected = sum <= 3 ? 'easy' : sum === 4 ? 'normal' : 'hard';
-        expect(difficultyOf(precision, sea), `정밀함 ${precision}, 바다 ${sea}`).toBe(expected);
+        expect(difficultyOf(seaScore, riskScore), `바다 ${seaScore}, 위험 ${riskScore}`).toBe(expected);
       }
     }
   });
@@ -61,10 +63,55 @@ describe('코스의 등급', () => {
 });
 
 describe('코스 목록의 난이도 자료', () => {
-  it('모든 코스의 정밀함과 바다의 거칠기는 1, 2, 3 중 하나이다', () => {
+  it('모든 코스의 바다의 세기와 위험한 선택은 1, 2, 3 중 하나이다', () => {
     for (const course of COURSES) {
-      expect(LEVELS, `${course.id} 정밀함`).toContain(course.precision);
-      expect(LEVELS, `${course.id} 바다`).toContain(course.sea);
+      expect(LEVELS, `${course.id} 바다의 세기`).toContain(course.seaScore);
+      expect(LEVELS, `${course.id} 위험한 선택`).toContain(course.riskScore);
+    }
+  });
+
+  it('바다의 세기는 코스의 파도의 단계와 환경으로 계산한다', () => {
+    for (const course of COURSES) {
+      expect(course.seaScore, course.id).toBe(seaScoreOf(course.seaLevel, course.seaStep));
+    }
+  });
+
+  it('위험한 코너와 옆파도 구간은 출발점, 관문, 도착선을 이은 경로와 코스의 풍향으로 센다', () => {
+    for (const course of COURSES) {
+      // 관문의 가운데만 넘긴다. 관문의 폭과 방향은 난이도에 넣지 않는다.
+      const points = [course.start, ...course.gates].map(({ x, z }) => ({ x, z }));
+      expect(course.risks, course.id).toEqual(countRisks(points, course.windFromDeg));
+    }
+  });
+
+  it('위험한 선택의 점수는 코너를 언제나 세고, 옆파도 구간은 바다의 세기가 3일 때만 세어서 정한다', () => {
+    for (const course of COURSES) {
+      // riskyChoices를 쓰지 않고 명세의 문장대로 직접 센다.
+      const count = course.risks.corners + (course.seaScore === 3 ? course.risks.beamLegs : 0);
+      expect(course.riskScore, course.id).toBe(riskScoreOf(count));
+      expect(course.riskScore, course.id).toBe(riskScoreOf(riskyChoices(course.risks, course.seaScore)));
+    }
+  });
+
+  it('등급은 계산한 바다의 세기와 위험한 선택으로 정한다', () => {
+    for (const course of COURSES) {
+      expect(course.difficulty, course.id).toBe(difficultyOf(course.seaScore, course.riskScore));
+    }
+  });
+
+  it('난이도를 손으로 적지 않는다: 코스 자료에 정밀함, 바다의 거칠기, 점수, 등급을 적지 않는다', () => {
+    const handWritten = ['precision', 'sea', 'seaScore', 'risks', 'riskScore', 'difficulty'];
+    for (const definition of definitions as Record<string, unknown>[]) {
+      for (const key of handWritten) {
+        expect(definition, `${String(definition.id)}의 ${key}`).not.toHaveProperty(key);
+      }
+    }
+  });
+
+  it('관문의 폭으로 매기던 정밀함과 바다의 거칠기는 코스에 남아 있지 않다', () => {
+    for (const course of COURSES) {
+      expect(course, course.id).not.toHaveProperty('precision');
+      expect(course, course.id).not.toHaveProperty('sea');
     }
   });
 
@@ -78,11 +125,21 @@ describe('코스 목록의 난이도 자료', () => {
 describe('쉬움의 기준인 미륵도 앞바다 스프린트', () => {
   const course = COURSES.find((c) => c.id === MIREUK.id);
 
-  it('정밀함 1, 바다 2로 쉬움이다', () => {
+  it('쉬움이다', () => {
     expect(course).toBeDefined();
-    expect(course!.precision).toBe(1);
-    expect(course!.sea).toBe(2);
-    expect(difficultyOf(course!.precision, course!.sea)).toBe('easy');
+    expect(course!.difficulty).toBe('easy');
+  });
+
+  it('환경을 고정하지 않은 4단계 코스이므로 가운데 환경으로 보아 바다의 세기가 2이다', () => {
+    expect(course!.seaStep).toBeUndefined();
+    expect(course!.seaScore).toBe(2);
+  });
+
+  it('바다의 세기가 2이면서 쉬움이려면 위험한 선택이 1이다', () => {
+    // 합이 3 이하여야 쉬움이므로, 바다의 세기 2에서 위험한 선택은 1뿐이다 (위험한 선택 0~1개).
+    // 바다의 세기가 2이므로 옆파도 구간은 세지 않고 위험한 코너만 센다.
+    expect(course!.riskScore).toBe(1);
+    expect(course!.risks.corners).toBeLessThanOrEqual(1);
   });
 
   it('판과 조건이 그대로여서 저장된 기록이 유효하다', () => {

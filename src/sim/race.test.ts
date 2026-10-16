@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COURSES, difficultyOf, type Course, type Difficulty } from '../course/course';
+import { COURSES, type Course, type Difficulty } from '../course/course';
 import { Race, segmentsCross } from './race';
 
 const DT = 1 / 60;
@@ -19,8 +19,11 @@ const COURSE: Course = {
   seaLevel: 1,
   windFromDeg: 0,
   gateWidth: 40,
-  precision: 1,
-  sea: 1,
+  // 경로를 재거나 경주를 진행하는 데는 난이도가 쓰이지 않으므로 가장 낮은 값으로 둔다.
+  seaScore: 1,
+  risks: { corners: 0, beamLegs: 0 },
+  riskScore: 1,
+  difficulty: 'easy',
   start: { x: 0, z: 0, heading: 0 },
   gates: [gateAt(-100, false), gateAt(-200, true)],
   length: 200,
@@ -132,7 +135,7 @@ describe('코스의 자료', () => {
     const SPEED: Record<Difficulty, number> = { easy: 15, normal: 15, hard: 12 };
     expect(COURSES.length).toBeGreaterThan(0);
     for (const course of COURSES) {
-      const speed = SPEED[difficultyOf(course.precision, course.sea)];
+      const speed = SPEED[course.difficulty];
       expect(course.length / speed, course.id).toBeLessThanOrEqual(165);
     }
   });

@@ -15,7 +15,7 @@ import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
 import { createStage } from './core/renderer';
-import { COURSES, difficultyOf } from './course/course';
+import { COURSES } from './course/course';
 import { LocalRecordStore } from './course/records';
 import { createTimeOfDay, sunPosition } from './environment/sun';
 import { createWeather, updateWeather } from './environment/weather';
@@ -327,11 +327,11 @@ let statusSentAt = -Infinity;
 
 // ---- 핸드폰의 명령과 게임의 상황 ----
 
-const COURSE_ITEMS: MenuItem[] = COURSES.map(({ id, name, note, precision, sea }) => ({
+const COURSE_ITEMS: MenuItem[] = COURSES.map(({ id, name, note, difficulty }) => ({
   id,
   name,
   note,
-  difficulty: difficultyOf(precision, sea),
+  difficulty,
 }));
 // 시작 위치에는 ID가 없으므로 목록의 순번을 ID로 쓴다. 목록은 게임을 연 동안 바뀌지 않는다.
 const START_ITEMS: MenuItem[] = REGION.starts.map(({ name, note }, index) => ({ id: String(index), name, note }));

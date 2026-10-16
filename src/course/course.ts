@@ -1,5 +1,7 @@
 import { latLonToWorld, type LatLon } from '../geo/projection';
 import definitions from './courses.json';
+import { difficultyOf, type Difficulty } from './difficulty';
+import { countRisks, riskScoreOf, riskyChoices, seaScoreOf, type RiskCount } from './risk';
 
 /** courses.json에 적는 코스 한 개 */
 interface CourseDefinition {
@@ -16,10 +18,6 @@ interface CourseDefinition {
   windFromDeg: number;
   /** 관문의 폭 (m) */
   gateWidth: number;
-  /** 조종의 정밀함 (1 낮음, 2 중간, 3 높음). 기준은 명세의 "난이도" 절에 있다. */
-  precision: number;
-  /** 바다의 거칠기 (1 낮음, 2 중간, 3 높음) */
-  sea: number;
   start: LatLon;
   /** 순서대로 지나야 하는 관문 */
   gates: LatLon[];
@@ -55,10 +53,14 @@ export interface Course {
   seaStep?: number;
   windFromDeg: number;
   gateWidth: number;
-  /** 조종의 정밀함 (1~3) */
-  precision: number;
-  /** 바다의 거칠기 (1~3) */
-  sea: number;
+  /** 바다의 세기 (1~3). 파도의 단계와 환경으로 계산한다. */
+  seaScore: number;
+  /** 경로에서 센 위험한 코너와 옆파도 구간 */
+  risks: RiskCount;
+  /** 위험한 선택의 점수 (1~3) */
+  riskScore: number;
+  /** seaScore와 riskScore로 정한 등급 */
+  difficulty: Difficulty;
   /** 출발 위치와 선수 방위 (rad). 첫 관문을 향한다. */
   start: { x: number; z: number; heading: number };
   /** 순서대로 지나야 하는 관문. 마지막이 도착선이다. */
@@ -112,6 +114,10 @@ function build(definition: CourseDefinition): Course {
   }
 
   const [start, first] = points;
+  // 등급은 손으로 적지 않고 코스의 바다와 경로로 계산한다. 관문의 폭은 넣지 않는다.
+  const seaScore = seaScoreOf(definition.seaLevel, definition.seaStep);
+  const risks = countRisks(points, definition.windFromDeg);
+  const riskScore = riskScoreOf(riskyChoices(risks, seaScore));
   return {
     id: definition.id,
     version: definition.version,
@@ -121,8 +127,10 @@ function build(definition: CourseDefinition): Course {
     seaStep: definition.seaStep,
     windFromDeg: definition.windFromDeg,
     gateWidth: definition.gateWidth,
-    precision: definition.precision,
-    sea: definition.sea,
+    seaScore,
+    risks,
+    riskScore,
+    difficulty: difficultyOf(seaScore, riskScore),
     start: { x: start.x, z: start.z, heading: headingOf(first.x - start.x, first.z - start.z) },
     gates,
     length,

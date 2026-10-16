@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { latLonToWorld } from '../geo/projection';
 import { layoutBridge } from '../world/bridges';
 import type { ChartData } from '../world/chartData';
-import { COURSES, difficultyOf, type Course, type Difficulty } from './course';
+import { COURSES, type Course } from './course';
 import { courseWorld, measureCourse, type CourseWorld } from './courseCheck';
 // 자료는 게임이 내려받는 파일 그대로를 문자열로 읽는다. 큰 JSON을 타입으로 추론하지 않도록 ?raw를 쓴다.
 import chartText from '../../public/data/chart.json?raw';
@@ -12,14 +12,10 @@ import seamarksText from '../../public/data/seamarks.json?raw';
 // 해안선과 해도 자료를 실제로 읽어서, 코스 자료(courses.json) → 장애물 변환 → 거리 측정을 엮어 확인한다.
 
 /**
- * 명세 "코스" 절의 표: 등급마다 경로가 떨어져 있어야 하는 거리 (m).
+ * 명세 "코스" 절의 표: 등급과 관계없이 모든 코스의 경로가 떨어져 있어야 하는 거리 (m).
  * 구현의 상수를 가져오지 않고 여기에 따로 적는다.
  */
-const MIN_CLEARANCE: Record<Difficulty, { shore: number; pier: number; seamark: number }> = {
-  easy: { shore: 100, pier: 100, seamark: 30 },
-  normal: { shore: 50, pier: 20, seamark: 30 },
-  hard: { shore: 15, pier: 20, seamark: 30 },
-};
+const MIN_CLEARANCE = { shore: 15, pier: 20, seamark: 30 } as const;
 
 const land = (JSON.parse(landText) as { geometry: { coordinates: [number, number][][][] } }).geometry.coordinates;
 const chart = JSON.parse(chartText) as ChartData;
@@ -43,8 +39,11 @@ function courseThrough(points: { x: number; z: number }[]): Course {
     seaLevel: 1,
     windFromDeg: 0,
     gateWidth: 40,
-    precision: 1,
-    sea: 1,
+    // 경로를 재거나 경주를 진행하는 데는 난이도가 쓰이지 않으므로 가장 낮은 값으로 둔다.
+    seaScore: 1,
+    risks: { corners: 0, beamLegs: 0 },
+    riskScore: 1,
+    difficulty: 'easy',
     start: { x: start.x, z: start.z, heading: 0 },
     gates: rest.map((p, i) => ({
       ...p,
@@ -100,7 +99,7 @@ describe('실제 자료로 만든 장애물이 믿을 만하다', () => {
   });
 });
 
-describe('모든 타임어택 코스는 등급의 기준만큼 장애물에서 떨어져 있다', () => {
+describe('모든 타임어택 코스는 등급과 관계없이 같은 기준만큼 장애물에서 떨어져 있다', () => {
   it('코스가 하나 이상 있다', () => {
     expect(COURSES.length).toBeGreaterThan(0);
   });
@@ -111,18 +110,18 @@ describe('모든 타임어택 코스는 등급의 기준만큼 장애물에서 �
         expect(measureCourse(course, world()).onLand).toBe(false);
       });
 
-      it('해안선에서 등급이 정한 거리 이상 떨어져 있다', () => {
-        const { shore } = MIN_CLEARANCE[difficultyOf(course.precision, course.sea)];
+      it('해안선에서 15m 이상 떨어져 있다', () => {
+        const { shore } = MIN_CLEARANCE;
         expect(measureCourse(course, world()).shore).toBeGreaterThanOrEqual(shore);
       });
 
-      it('게임이 세우는 교각에서 등급이 정한 거리 이상 떨어져 있다', () => {
-        const { pier } = MIN_CLEARANCE[difficultyOf(course.precision, course.sea)];
+      it('게임이 세우는 교각에서 20m 이상 떨어져 있다', () => {
+        const { pier } = MIN_CLEARANCE;
         expect(measureCourse(course, world()).pier).toBeGreaterThanOrEqual(pier);
       });
 
       it('등대와 부표에서 30m 이상 떨어져 있다', () => {
-        const { seamark } = MIN_CLEARANCE[difficultyOf(course.precision, course.sea)];
+        const { seamark } = MIN_CLEARANCE;
         expect(measureCourse(course, world()).seamark).toBeGreaterThanOrEqual(seamark);
       });
     });
