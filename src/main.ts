@@ -508,7 +508,8 @@ startLoop({
     updateWeather(weather, frameTime, timeAttack.weatherRandom);
     exposure.update(frameTime, focus.x, focus.z, wind.fromDeg, swell.fromDeg);
     updateWaves(wind, swell, exposure, frameTime);
-    ship.syncObject(seaTime, frameTime, windVelocity(wind));
+    // 카운트다운 동안에는 배가 멈춰 있어서 옆파도에 쉽게 뒤집히므로, 흔들리기만 하게 한다.
+    ship.syncObject(seaTime, frameTime, windVelocity(wind), timeAttack.frozen);
     seaEffects.update(frameTime);
     chaseCamera.update(frameTime, focus);
     terrain.update(focus.x, focus.z);

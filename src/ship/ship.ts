@@ -19,6 +19,9 @@ const HULL_CONTACT_POINTS = [
   [-0.48, 0],
 ] as const;
 
+// 출발을 기다리는 동안 수면의 기울기에서 벗어날 수 있는 가장 큰 각도 (rad). 흔들림은 보이되 뒤집힐 각도에는 한참 못 미친다.
+const STEADY_MAX_OFFSET = (20 * Math.PI) / 180;
+
 export class Ship {
   readonly state: ShipState = createShipState();
   readonly controls: ShipControls = { throttle: 0, rudder: 0 };
@@ -123,8 +126,9 @@ export class Ship {
    * elapsed는 수면의 셰이더에 전달하는 시간과 동일해야 한다.
    *
    * @param wind 바람이 공기를 이동시키는 속도 (월드 좌표, m/s)
+   * @param steady true이면 선체가 수면의 기울기를 따라 흔들리기만 하고 뒤집히지 않는다. 타임어택의 카운트다운에 사용한다.
    */
-  syncObject(elapsed: number, frameTime: number, wind: { x: number; z: number }): void {
+  syncObject(elapsed: number, frameTime: number, wind: { x: number; z: number }, steady = false): void {
     const { state, object, spec } = this;
     const load = measureSeaLoad(spec, state, wind, elapsed);
 
@@ -137,11 +141,20 @@ export class Ship {
     // 뒤집힌 선체는 넓은 갑판이 물에 잠겨서 흔들림이 금방 잦아든다.
     const params = this.capsized ? { ...spec.motion.roll, damping: CAPSIZED_DAMPING } : spec.motion.roll;
     const speed = Math.hypot(state.surge, state.sway);
-    stepRoll(this.roll, load.surfaceSlope, this.capsized ? 0 : load.heeling, params, speed, frameTime);
-    this.breaking = this.capsized ? 0 : load.breaking;
+    stepRoll(this.roll, load.surfaceSlope, this.capsized || steady ? 0 : load.heeling, params, speed, frameTime);
+    this.breaking = this.capsized || steady ? 0 : load.breaking;
+    if (steady) {
+      // 출발을 기다리는 동안 멈춘 배가 옆파도에 뒤집히면 시작도 하기 전에 끝난다.
+      // 수면을 따라 흔들리게는 두되, 수면에서 벗어나는 기울기를 제한해서 뒤집히지 않게 한다.
+      const offset = this.roll.angle - load.surfaceSlope;
+      if (Math.abs(offset) > STEADY_MAX_OFFSET) {
+        this.roll.angle = load.surfaceSlope + Math.sign(offset) * STEADY_MAX_OFFSET;
+        this.roll.rate = 0;
+      }
+    }
 
     // 수면에 대한 기울기가 복원력이 사라지는 각도를 넘으면 되돌아오지 못한다.
-    if (!this.capsized && Math.abs(this.roll.angle - load.surfaceSlope) > spec.motion.roll.vanishingAngle) {
+    if (!this.capsized && !steady && Math.abs(this.roll.angle - load.surfaceSlope) > spec.motion.roll.vanishingAngle) {
       this.capsized = true;
     }
 
