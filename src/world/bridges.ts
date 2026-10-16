@@ -99,37 +99,15 @@ export class Bridges {
     const supports: THREE.BufferGeometry[] = [];
 
     for (const bridge of bridges) {
-      const stations = resample(
-        bridge.points.map(([lon, lat]) => latLonToWorld({ lat, lon })),
-        SAMPLE_SPACING,
-      );
-      if (stations.length < 2) continue;
-      const length = (stations.length - 1) * SAMPLE_SPACING;
-      const ramp = Math.min(RAMP_LENGTH, length / 3);
-      const halfWidth = bridge.width / 2;
-
-      // 양 끝에서는 육지의 도로 높이에 맞추고, 가운데로 갈수록 선박이 지날 수 있는 높이까지 올린다.
-      const profile: Station[] = stations.map(({ x, z }, i) => {
-        const fromEnd = Math.min(i, stations.length - 1 - i) * SAMPLE_SPACING;
-        const lift = THREE.MathUtils.smoothstep(fromEnd, 0, ramp);
-        const top = ABUTMENT_HEIGHT + Math.max(bridge.clearance + DECK_THICKNESS - ABUTMENT_HEIGHT, 0) * lift;
-        return { x, z, underside: top - DECK_THICKNESS };
-      });
+      const layout = layoutBridge(bridge);
+      if (!layout) continue;
+      const { profile, halfWidth } = layout;
 
       decks.push(createDeck(profile, halfWidth, anchor));
       const span: Span = { stations: profile, halfWidth };
       for (const station of profile) this.spans.insertPoint(station.x, station.z, span, SPAN_MARGIN);
 
-      const tall = bridge.structure === 'cable-stayed' || bridge.structure === 'suspension';
-      const towerAt = tall ? [Math.round(profile.length * 0.3), Math.round(profile.length * 0.7)] : [];
-      const pierStep = Math.round(PIER_SPACING / SAMPLE_SPACING);
-      for (let i = pierStep; i < profile.length - 1; i += pierStep) {
-        const station = profile[i];
-        // 상판이 낮은 양 끝에는 교각을 세우지 않는다.
-        if (station.underside < 3) continue;
-        const direction = Math.atan2(profile[i + 1].x - profile[i - 1].x, profile[i + 1].z - profile[i - 1].z);
-        const isTower = towerAt.some((index) => Math.abs(index - i) < pierStep / 2);
-
+      for (const { station, direction, isTower, radius } of layout.piers) {
         const height = station.underside - PIER_BOTTOM;
         const pier = new THREE.BoxGeometry(bridge.width * 0.6, height, PIER_THICKNESS);
         pier.rotateY(direction);
@@ -157,7 +135,6 @@ export class Bridges {
           supports.push(beam);
         }
 
-        const radius = Math.max(bridge.width * 0.3, PIER_THICKNESS / 2) + (isTower ? 4 : 0);
         const entry = { x: station.x, z: station.z, radius };
         this.pierList.push(entry);
         this.piers.insertPoint(station.x, station.z, entry, radius);
@@ -180,6 +157,57 @@ export class Bridges {
       scene.add(mesh);
     }
   }
+}
+
+/** 게임이 다리 하나를 세우는 모양. 상판의 높이와 교각의 위치를 담는다. */
+export interface BridgeLayout {
+  profile: Station[];
+  halfWidth: number;
+  piers: {
+    station: Station;
+    /** 교각을 세우는 방향 (상판의 진행 방향, rad) */
+    direction: number;
+    isTower: boolean;
+    /** 선박이 닿으면 충돌로 보는 반지름 (m) */
+    radius: number;
+  }[];
+}
+
+/**
+ * 다리 하나의 상판과 교각을 배치한다. 화면과 충돌 판정, 그리고 코스를 검사하는 테스트가 같은 교각 위치를 쓰도록 순수 함수로 둔다.
+ * 자료에는 교각의 위치가 없으므로, 중심선을 따라 일정한 간격으로 세운다. 점이 둘보다 적으면 undefined
+ */
+export function layoutBridge(bridge: ChartBridge): BridgeLayout | undefined {
+  const stations = resample(
+    bridge.points.map(([lon, lat]) => latLonToWorld({ lat, lon })),
+    SAMPLE_SPACING,
+  );
+  if (stations.length < 2) return undefined;
+  const length = (stations.length - 1) * SAMPLE_SPACING;
+  const ramp = Math.min(RAMP_LENGTH, length / 3);
+
+  // 양 끝에서는 육지의 도로 높이에 맞추고, 가운데로 갈수록 선박이 지날 수 있는 높이까지 올린다.
+  const profile: Station[] = stations.map(({ x, z }, i) => {
+    const fromEnd = Math.min(i, stations.length - 1 - i) * SAMPLE_SPACING;
+    const lift = THREE.MathUtils.smoothstep(fromEnd, 0, ramp);
+    const top = ABUTMENT_HEIGHT + Math.max(bridge.clearance + DECK_THICKNESS - ABUTMENT_HEIGHT, 0) * lift;
+    return { x, z, underside: top - DECK_THICKNESS };
+  });
+
+  const tall = bridge.structure === 'cable-stayed' || bridge.structure === 'suspension';
+  const towerAt = tall ? [Math.round(profile.length * 0.3), Math.round(profile.length * 0.7)] : [];
+  const pierStep = Math.round(PIER_SPACING / SAMPLE_SPACING);
+  const piers: BridgeLayout['piers'] = [];
+  for (let i = pierStep; i < profile.length - 1; i += pierStep) {
+    const station = profile[i];
+    // 상판이 낮은 양 끝에는 교각을 세우지 않는다.
+    if (station.underside < 3) continue;
+    const direction = Math.atan2(profile[i + 1].x - profile[i - 1].x, profile[i + 1].z - profile[i - 1].z);
+    const isTower = towerAt.some((index) => Math.abs(index - i) < pierStep / 2);
+    const radius = Math.max(bridge.width * 0.3, PIER_THICKNESS / 2) + (isTower ? 4 : 0);
+    piers.push({ station, direction, isTower, radius });
+  }
+  return { profile, halfWidth: bridge.width / 2, piers };
 }
 
 /** 꺾은선을 따라 일정한 간격으로 점을 다시 찍는다. 자료의 점은 간격이 제각각이어서, 높이의 변화를 고르게 표현할 수 없다. */
