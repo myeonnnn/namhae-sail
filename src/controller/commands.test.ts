@@ -199,6 +199,36 @@ describe('게임이 알려 주는 상황', () => {
     expect(decodeSituation(encodeSituation(empty))).toEqual(empty);
   });
 
+  it('코스 목록의 난이도를 코스마다 그대로 읽는다', () => {
+    const courses: MenuItem[] = [
+      { ...COURSES[0], difficulty: 'easy' },
+      { ...COURSES[1], difficulty: 'normal' },
+      { id: 'gyeonnae', name: '견내량 빠져나가기', note: '좁은 해협을 지나는 코스', difficulty: 'hard' },
+    ];
+    const message = situation('start', { courses });
+    const decoded = decodeSituation(encodeSituation(message));
+    expect(decoded?.courses).toEqual(courses);
+    expect(decoded).toEqual(message);
+  });
+
+  it('난이도가 없는 시작 위치의 항목은 난이도 없이 그대로 읽는다', () => {
+    const message = situation('sailing', { courses: [{ ...COURSES[0], difficulty: 'hard' }] });
+    const decoded = decodeSituation(encodeSituation(message));
+    expect(decoded?.starts).toEqual(STARTS);
+    for (const start of decoded?.starts ?? []) expect(start, start.id).not.toHaveProperty('difficulty');
+  });
+
+  it('코스 항목의 난이도가 easy, normal, hard가 아니면 상황 알림 전체를 무시한다', () => {
+    // null도 "난이도가 있는데 맞지 않는 값"으로 본다. 빠진 것(undefined)과는 다르다.
+    for (const difficulty of ['', 'Easy', 'EASY', 'medium', '쉬움', 'easy ', 1, 0, true, null, {}, ['easy']]) {
+      const courses = [
+        { ...COURSES[0], difficulty: 'easy' },
+        { ...COURSES[1], difficulty },
+      ];
+      expect(decodeSituation(badSituation({ courses })), `difficulty ${JSON.stringify(difficulty)}`).toBeUndefined();
+    }
+  });
+
   it('모르는 장면은 무시한다', () => {
     for (const scene of ['paused', '', 'Sailing', 3, null]) {
       expect(decodeSituation(badSituation({ scene })), `scene ${scene}`).toBeUndefined();

@@ -1,3 +1,4 @@
+import type { Difficulty } from '../course/difficulty';
 /**
  * 핸드폰이 버튼으로 내리는 명령. PC에서 같은 버튼을 누른 것과 같다.
  * - startSailing: 시작 화면의 "항해 시작"
@@ -35,6 +36,8 @@ export interface MenuItem {
   name: string;
   /** 어떤 곳인지 알려 주는 짧은 설명 */
   note: string;
+  /** 타임어택 코스의 등급. 시작 위치에는 없다. 있으면 'easy', 'normal', 'hard' 중 하나여야 한다 */
+  difficulty?: Difficulty;
 }
 
 /** 타임어택을 하는 동안의 정보 */
@@ -110,6 +113,7 @@ export function encodeSituation(situation: GameSituation): string {
  * 받은 문자열을 상황으로 읽는다.
  * 형식이 맞지 않으면 undefined를 돌려준다: 상황 메시지가 아니거나, scene이 GameScene이 아니거나,
  * 참거짓 값이 참거짓이 아니거나, seaLevel이 1~5의 정수가 아니거나, 목록의 항목에 문자열 id, name, note가 없거나,
+ * 항목의 difficulty가 있는데 'easy', 'normal', 'hard'가 아니거나,
  * race의 숫자가 유한한 수가 아닌 경우이다.
  * 조종 메시지, 배의 상태 메시지, 명령 메시지를 넣어도 undefined이다.
  */
@@ -124,8 +128,8 @@ export function decodeSituation(text: string): GameSituation | undefined {
   const situation: GameSituation = {
     scene: scene as GameScene,
     capsized,
-    courses: courses.map(({ id, name, note }) => ({ id, name, note })),
-    starts: starts.map(({ id, name, note }) => ({ id, name, note })),
+    courses: courses.map(readItem),
+    starts: starts.map(readItem),
     seaLevel,
     seaLevelLocked,
     soundOn,
@@ -194,16 +198,24 @@ function isSeaLevel(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5;
 }
 
+const DIFFICULTIES: readonly unknown[] = ['easy', 'normal', 'hard'];
+
 function isMenu(value: unknown): value is MenuItem[] {
   return (
     Array.isArray(value) &&
-    value.every(
-      (item: unknown) =>
-        typeof item === 'object' &&
-        item !== null &&
-        ['id', 'name', 'note'].every((key) => typeof (item as Record<string, unknown>)[key] === 'string'),
-    )
+    value.every((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return false;
+      const record = item as Record<string, unknown>;
+      if (!['id', 'name', 'note'].every((key) => typeof record[key] === 'string')) return false;
+      // 난이도는 코스에만 있으므로 없어도 되지만, 있으면 알려진 값이어야 한다.
+      return !('difficulty' in record) || DIFFICULTIES.includes(record.difficulty);
+    })
   );
+}
+
+/** 목록의 항목에서 알려진 필드만 옮긴다. 난이도가 없는 항목(시작 위치)에는 difficulty를 만들지 않는다. */
+function readItem({ id, name, note, difficulty }: MenuItem): MenuItem {
+  return difficulty === undefined ? { id, name, note } : { id, name, note, difficulty };
 }
 
 function readRace(value: unknown): RaceSummary | undefined {

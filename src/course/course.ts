@@ -14,6 +14,10 @@ interface CourseDefinition {
   windFromDeg: number;
   /** 관문의 폭 (m) */
   gateWidth: number;
+  /** 조종의 정밀함 (1 낮음, 2 중간, 3 높음). 기준은 명세의 "난이도" 절에 있다. */
+  precision: number;
+  /** 바다의 거칠기 (1 낮음, 2 중간, 3 높음) */
+  sea: number;
   start: LatLon;
   /** 순서대로 지나야 하는 관문 */
   gates: LatLon[];
@@ -36,6 +40,9 @@ export interface Gate {
   finish: boolean;
 }
 
+// 등급의 규칙은 핸드폰 컨트롤러도 쓰므로, 코스 자료(courses.json)를 끌어오지 않는 작은 모듈에 둔다.
+export { DIFFICULTY_LABELS, difficultyOf, type Difficulty } from './difficulty';
+
 export interface Course {
   id: string;
   version: number;
@@ -44,6 +51,10 @@ export interface Course {
   seaLevel: number;
   windFromDeg: number;
   gateWidth: number;
+  /** 조종의 정밀함 (1~3) */
+  precision: number;
+  /** 바다의 거칠기 (1~3) */
+  sea: number;
   /** 출발 위치와 선수 방위 (rad). 첫 관문을 향한다. */
   start: { x: number; z: number; heading: number };
   /** 순서대로 지나야 하는 관문. 마지막이 도착선이다. */
@@ -105,6 +116,8 @@ function build(definition: CourseDefinition): Course {
     seaLevel: definition.seaLevel,
     windFromDeg: definition.windFromDeg,
     gateWidth: definition.gateWidth,
+    precision: definition.precision,
+    sea: definition.sea,
     start: { x: start.x, z: start.z, heading: headingOf(first.x - start.x, first.z - start.z) },
     gates,
     length,

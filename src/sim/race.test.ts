@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COURSES, type Course } from '../course/course';
+import { COURSES, difficultyOf, type Course, type Difficulty } from '../course/course';
 import { Race, segmentsCross } from './race';
 
 const DT = 1 / 60;
@@ -19,6 +19,8 @@ const COURSE: Course = {
   seaLevel: 1,
   windFromDeg: 0,
   gateWidth: 40,
+  precision: 1,
+  sea: 1,
   start: { x: 0, z: 0, heading: 0 },
   gates: [gateAt(-100, false), gateAt(-200, true)],
   length: 200,
@@ -124,9 +126,14 @@ describe('코스의 자료', () => {
     }
   });
 
-  it('첫 코스는 2분 안에 돌 수 있는 길이이다', () => {
-    // 최고 속력의 3분의 2인 초속 22m(약 43노트)로 달려도 2분이 걸리지 않아야 한다.
-    expect(COURSES[0].length / 22).toBeLessThan(120);
-    expect(COURSES[0].length).toBeGreaterThan(1500);
+  it('모든 코스는 등급이 정한 속력으로 달려도 165초 안에 도착하는 길이이다', () => {
+    // 명세: 쉬움과 보통은 초속 15m(약 29노트), 어려움은 초속 12m로 달려도 165초 안에 도착한다.
+    // 3분에서 선회와 출발과 맞바람을 위한 여유를 남긴 값이다.
+    const SPEED: Record<Difficulty, number> = { easy: 15, normal: 15, hard: 12 };
+    expect(COURSES.length).toBeGreaterThan(0);
+    for (const course of COURSES) {
+      const speed = SPEED[difficultyOf(course.precision, course.sea)];
+      expect(course.length / speed, course.id).toBeLessThanOrEqual(165);
+    }
   });
 });
