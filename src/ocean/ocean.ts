@@ -17,7 +17,7 @@ export const SHALLOW_RANGE = 700;
 const DETAIL_DISPLACE_RANGE = 140;
 const SKY_CUBE_SIZE = 256;
 // 이 거리에서 물체의 색상이 약 63%만큼 수평선의 색상으로 바뀐다.
-const HAZE_DISTANCE = 9000;
+const HAZE_DISTANCE = 14000;
 // 수평선 부근 하늘의 색상. 지형과 같은 일반 물체가 먼 곳에서 이 색상으로 흐려지며, 태양의 고도에 따라 섞어서 사용한다.
 const HAZE_DAY = new THREE.Color(0xc3d0db);
 const HAZE_DUSK = new THREE.Color(0xd8b396);
@@ -69,6 +69,8 @@ export class Ocean {
     skyUniforms['rayleigh'].value = 1.2;
     skyUniforms['mieCoefficient'].value = 0.005;
     skyUniforms['mieDirectionalG'].value = 0.8;
+    // three.js 0.186의 Sky는 기본으로 하늘의 40%를 흐릿한 구름으로 덮는다. 해에 비친 구름이 하늘 전체를 뿌옇게 만들므로 끈다.
+    skyUniforms['cloudCoverage'].value = 0;
     // 하늘의 셰이더는 대기의 산란을 픽셀마다 계산해서 장면에서 가장 무겁다.
     // 다른 물체보다 먼저 그리면 수면과 지형에 가려질 픽셀까지 모두 계산하게 되므로, 가장 나중에 그려서 비어 있는 픽셀만 채운다.
     // Sky는 정점의 깊이를 가장 먼 값으로 고정하므로, 이미 그려진 물체가 있는 픽셀은 깊이 검사에서 걸러진다.
