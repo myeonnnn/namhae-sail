@@ -50,6 +50,8 @@ export interface SeaState {
   holdRemaining: number;
   /** 개발 도구로 풍속이나 너울을 직접 바꿨으면 true. 다시 단계를 고를 때까지 환경을 자동으로 바꾸지 않는다. */
   manual: boolean;
+  /** 타임어택 코스가 환경 하나를 골랐으면 true. 풀어 줄 때까지 그 환경에 머문다. */
+  fixed: boolean;
 }
 
 /** 단계를 고른다. 바람과 너울은 그 단계의 가운데 환경으로 바로 바뀐다. */
@@ -58,13 +60,33 @@ export function selectSeaLevel(state: SeaState, level: number, wind: Wind, swell
   state.step = 1;
   state.holdRemaining = HOLD_SECONDS[0];
   state.manual = false;
+  state.fixed = false;
   const { windSpeed, swellHeight } = SEA_LEVELS[level - 1].steps[1];
   wind.speed = windSpeed;
   swell.height = swellHeight;
 }
 
+/**
+ * 단계 안의 환경 하나를 골라서 그 환경에 머물게 한다. 바람과 너울은 그 환경의 값으로 바로 바뀌고,
+ * releaseSeaStep이나 selectSeaLevel을 부르기 전까지 updateSeaState가 바꾸지 않는다.
+ * @param step 0 잔잔한 쪽, 1 가운데, 2 거친 쪽
+ */
+export function fixSeaStep(state: SeaState, level: number, step: number, wind: Wind, swell: Swell): void {
+  selectSeaLevel(state, level, wind, swell);
+  state.step = step;
+  state.fixed = true;
+  const target = SEA_LEVELS[level - 1].steps[step];
+  wind.speed = target.windSpeed;
+  swell.height = target.swellHeight;
+}
+
+/** fixSeaStep으로 고정한 환경을 풀어서, 다시 단계 안의 환경 사이를 오가게 한다. 고정하지 않았으면 아무것도 하지 않는다. */
+export function releaseSeaStep(state: SeaState): void {
+  state.fixed = false;
+}
+
 export function createSeaState(wind: Wind, swell: Swell, level = DEFAULT_SEA_LEVEL): SeaState {
-  const state: SeaState = { level, step: 1, holdRemaining: 0, manual: false };
+  const state: SeaState = { level, step: 1, holdRemaining: 0, manual: false, fixed: false };
   selectSeaLevel(state, level, wind, swell);
   return state;
 }
@@ -74,7 +96,7 @@ export function createSeaState(wind: Wind, swell: Swell, level = DEFAULT_SEA_LEV
  * @param random 0 이상 1 미만의 난수를 반환하는 함수. 테스트에서 결과를 고정하는 데 사용한다.
  */
 export function updateSeaState(state: SeaState, wind: Wind, swell: Swell, dt: number, random = Math.random): void {
-  if (state.manual) return;
+  if (state.manual || state.fixed) return;
 
   state.holdRemaining -= dt;
   if (state.holdRemaining <= 0) {

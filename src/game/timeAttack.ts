@@ -1,7 +1,7 @@
 import { hashString, seededRandom } from '../core/random';
 import type { Course } from '../course/course';
 import type { RaceResult, RecordStore } from '../course/records';
-import { selectSeaLevel } from '../environment/seaState';
+import { fixSeaStep, releaseSeaStep, selectSeaLevel } from '../environment/seaState';
 import type { Weather } from '../environment/weather';
 import { CAPSIZE_PENALTY, COUNTDOWN_SECONDS, Race, type RacePhase } from '../sim/race';
 import type { SeaEffects } from '../sim/seaEffects';
@@ -74,7 +74,9 @@ export class TimeAttack {
 
     // 같은 코스는 언제 도전해도 같은 바다여야 기록을 비교할 수 있다. 풍향과 파도의 세기, 날씨가 바뀌는 순서를 고정한다.
     wind.fromDeg = course.windFromDeg;
-    selectSeaLevel(sea, course.seaLevel, wind, swell);
+    // 환경을 고른 코스는 도전하는 동안 그 환경에 머문다. 바다가 오르내리면 같은 코너의 위험이 매번 달라져서 코스를 익힐 수 없다.
+    if (course.seaStep === undefined) selectSeaLevel(sea, course.seaLevel, wind, swell);
+    else fixSeaStep(sea, course.seaLevel, course.seaStep, wind, swell);
     this.random = seededRandom(hashString(`${course.id}:${course.version}`));
 
     host.placeShip(course.start.x, course.start.z, course.start.heading);
@@ -100,6 +102,8 @@ export class TimeAttack {
     host.hud.setCourse();
     host.raceHud.hide();
     host.seaEffects.resetCapsizeHandling();
+    // 자유 항해에서는 다시 단계 안의 환경 사이를 오간다.
+    releaseSeaStep(host.weather.sea);
   }
 
   /** 전복된 뒤에, 마지막으로 지난 관문에서 다시 출발한다. */

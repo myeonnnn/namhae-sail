@@ -10,6 +10,8 @@ interface CourseDefinition {
   note: string;
   /** 파도의 세기 (1~5). 코스마다 고정이다. */
   seaLevel: number;
+  /** 단계 안에서 고정할 환경 (0 잔잔한 쪽, 1 가운데, 2 거친 쪽). 없으면 단계 안의 환경 사이를 오간다. */
+  seaStep?: number;
   /** 바람이 불어오는 방향 (북쪽을 0으로 하는 시계 방향 각도). 코스마다 고정이다. */
   windFromDeg: number;
   /** 관문의 폭 (m) */
@@ -49,6 +51,8 @@ export interface Course {
   name: string;
   note: string;
   seaLevel: number;
+  /** 도전하는 동안 고정할 환경 (0~2). 없으면 단계 안의 환경 사이를 오간다. */
+  seaStep?: number;
   windFromDeg: number;
   gateWidth: number;
   /** 조종의 정밀함 (1~3) */
@@ -114,6 +118,7 @@ function build(definition: CourseDefinition): Course {
     name: definition.name,
     note: definition.note,
     seaLevel: definition.seaLevel,
+    seaStep: definition.seaStep,
     windFromDeg: definition.windFromDeg,
     gateWidth: definition.gateWidth,
     precision: definition.precision,
