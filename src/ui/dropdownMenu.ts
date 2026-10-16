@@ -83,6 +83,11 @@ export class DropdownMenu {
     else delete this.button.dataset.state;
   }
 
+  /** 메뉴를 연다. 시작 화면의 "타임어택 도전"처럼 버튼을 누르지 않고 메뉴를 열 때 쓴다. */
+  open(): void {
+    this.setOpen(true);
+  }
+
   /** 메뉴를 닫는다. 메뉴 안의 항목을 골랐을 때, 화면을 가리지 않도록 호출한다. */
   close(): void {
     this.setOpen(false);

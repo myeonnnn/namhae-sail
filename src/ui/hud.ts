@@ -194,6 +194,11 @@ export class Hud {
     this.instruments.setPhoneHints(phone);
   }
 
+  /** 메뉴 하나를 연다. */
+  openMenu(menu: MenuId): void {
+    this.menu(menu).open();
+  }
+
   closeMenus(): void {
     for (const menu of Object.values(this.menus)) menu.close();
   }

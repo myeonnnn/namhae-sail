@@ -15,7 +15,7 @@ import { Input } from './core/input';
 import { Observer } from './core/observer';
 import { startLoop } from './core/loop';
 import { createStage } from './core/renderer';
-import { COURSES } from './course/course';
+import { COURSES, difficultyOf } from './course/course';
 import { LocalRecordStore } from './course/records';
 import { createTimeOfDay, sunPosition } from './environment/sun';
 import { createWeather, updateWeather } from './environment/weather';
@@ -275,7 +275,8 @@ if (DEV_TOOLS) Object.assign(window, { __namhae: { stage, renderer, scene, camer
 
 // ---- 시작 화면 ----
 const startScreen = new StartScreen(document.body, {
-  timeAttack: () => timeAttack.start(COURSES[0]),
+  // 코스가 여럿이므로 첫 코스로 바로 시작하지 않고, 코스를 고를 수 있게 목록을 연다.
+  timeAttack: () => hud.openMenu('race'),
   guide: () => guide.open(),
 });
 if (startOptions.skipIntro) startScreen.dismiss();
@@ -326,7 +327,12 @@ let statusSentAt = -Infinity;
 
 // ---- 핸드폰의 명령과 게임의 상황 ----
 
-const COURSE_ITEMS: MenuItem[] = COURSES.map(({ id, name, note }) => ({ id, name, note }));
+const COURSE_ITEMS: MenuItem[] = COURSES.map(({ id, name, note, precision, sea }) => ({
+  id,
+  name,
+  note,
+  difficulty: difficultyOf(precision, sea),
+}));
 // 시작 위치에는 ID가 없으므로 목록의 순번을 ID로 쓴다. 목록은 게임을 연 동안 바뀌지 않는다.
 const START_ITEMS: MenuItem[] = REGION.starts.map(({ name, note }, index) => ({ id: String(index), name, note }));
 

@@ -1207,6 +1207,33 @@ body {
   font-weight: 600;
 }
 
+/* 코스 이름 앞의 난이도 표시. 등급마다 색을 달리해서 목록에서 한눈에 구별되게 한다. */
+.hud-difficulty {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.hud-difficulty[data-difficulty='easy'] {
+  background: rgba(95, 211, 138, 0.18);
+  color: var(--hud-starboard);
+}
+
+.hud-difficulty[data-difficulty='normal'] {
+  background: rgba(127, 208, 255, 0.18);
+  color: var(--hud-ahead);
+}
+
+.hud-difficulty[data-difficulty='hard'] {
+  background: rgba(255, 107, 107, 0.18);
+  color: var(--hud-port);
+}
+
 #hud .hud-start-points .hud-course-quit {
   display: block;
   color: var(--hud-text-muted);

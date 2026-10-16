@@ -1,4 +1,4 @@
-import type { Course } from '../course/course';
+import { DIFFICULTY_LABELS, difficultyOf, type Course } from '../course/course';
 import { createButton } from './dom';
 
 /**
@@ -12,7 +12,12 @@ export function createCourseList(
   list.className = 'hud-start-points';
   for (const course of courses) {
     const name = document.createElement('strong');
-    name.textContent = course.name;
+    const difficulty = difficultyOf(course.precision, course.sea);
+    const badge = document.createElement('em');
+    badge.className = 'hud-difficulty';
+    badge.dataset.difficulty = difficulty;
+    badge.textContent = DIFFICULTY_LABELS[difficulty];
+    name.append(badge, course.name);
     const note = document.createElement('span');
     note.textContent = `${(course.length / 1000).toFixed(1)} km · 관문 ${course.gates.length - 1}개 · 파도 ${course.seaLevel}단계`;
     list.append(createButton({ content: [name, note], onClick: () => actions.start(course) }));

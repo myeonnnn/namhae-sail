@@ -1,6 +1,14 @@
 import './controller.css';
 import { formatRaceTime } from '../ui/raceHud';
-import { canRunCommand, decodeSituation, encodeCommand, type ControllerCommand, type GameSituation } from './commands';
+import { DIFFICULTY_LABELS } from '../course/difficulty';
+import {
+  canRunCommand,
+  decodeSituation,
+  encodeCommand,
+  type ControllerCommand,
+  type GameSituation,
+  type MenuItem,
+} from './commands';
 import { connectToGame, LINK_STATUS_LABELS, type LinkStatus } from './link';
 import { peerIdFromUrl } from './pairing';
 import { decodeShipStatus, encodeHelm, type HelmMessage } from './protocol';
@@ -320,7 +328,7 @@ function buildCoursePicker(): Node[] {
   head.append(heading('h2', '타임어택 코스'), back);
   const list = column();
   for (const course of situation?.courses ?? []) {
-    list.append(commandTile(course.name, course.note, { kind: 'startRace', courseId: course.id }));
+    list.append(commandTile(courseLabel(course), course.note, { kind: 'startRace', courseId: course.id }));
   }
   return [head, list];
 }
@@ -354,7 +362,9 @@ function buildMenu(): Node[] {
   const racing = situation?.scene === 'countdown' || situation?.scene === 'racing';
   if (racing) races.append(commandTile('그만두기', '자유 항해로 돌아갑니다', { kind: 'quitRace' }, 'quit', true));
   for (const course of situation?.courses ?? []) {
-    races.append(commandTile(course.name, course.note, { kind: 'startRace', courseId: course.id }, undefined, true));
+    races.append(
+      commandTile(courseLabel(course), course.note, { kind: 'startRace', courseId: course.id }, undefined, true),
+    );
   }
 
   const starts = column('시작 위치');
@@ -405,6 +415,11 @@ function commandTile(
   if (variant) button.classList.add(variant);
   button.disabled = !canSend() || !situation || !canRunCommand(command, situation);
   return button;
+}
+
+/** 코스 이름 앞에 난이도를 붙인다. PC의 코스 목록과 같은 이름을 쓴다. */
+function courseLabel(course: MenuItem): string {
+  return course.difficulty ? `[${DIFFICULTY_LABELS[course.difficulty]}] ${course.name}` : course.name;
 }
 
 function tile(label: string, note: string | undefined, onClick: () => void): HTMLButtonElement {
