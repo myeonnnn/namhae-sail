@@ -7,11 +7,14 @@ export const TERRAIN_SEGMENTS = 128;
 const SEGMENTS = TERRAIN_SEGMENTS;
 // 표고가 이 값보다 낮은 지점은 바다로 취급한다. 표고 자료에서 수면은 0m 부근의 값으로 기록되어 있다.
 const SEA_LEVEL_THRESHOLD = 1;
-// 바다로 취급한 지점은 수면 아래로 내려서 파도와 겹치지 않게 한다.
-const SEABED_Y = -6;
+// 바다로 취급한 지점은 수면 아래로 깊이 내린다. 육지 꼭짓점과 바다 꼭짓점은 약 63m 떨어져 있어서 그 사이가 비탈이 되는데,
+// 얕게 내리면 비탈이 완만해서 파도의 골이 지날 때마다 물가선이 바다 쪽으로 10m 넘게 밀려 나온다. 좁은 운하에서는 물길이 육지로 바뀌어 보인다.
+// 깊게 내리면 비탈이 가팔라져서 물가선이 거의 움직이지 않고, 높이가 0m인 좌초 경계도 화면의 물가선 가까이로 온다.
+const SEABED_Y = -30;
 // 파도의 마루가 낮은 해안의 땅 위로 솟아오르지 않도록 육지 전체를 조금 들어 올린다.
 const LAND_LIFT = 2.5;
-const SKIRT_Y = -30;
+// 타일 사이의 틈을 가리는 벽은 해저보다 깊이 내려야 바다 쪽 틈도 가린다.
+const SKIRT_Y = -40;
 
 const COLOR_STOPS: ReadonlyArray<{ height: number; color: THREE.Color }> = [
   { height: 0, color: new THREE.Color(0xbdb59c) },
