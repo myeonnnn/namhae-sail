@@ -112,4 +112,43 @@ describe('GPU가 만드는 수면', () => {
     // GPU는 이웃한 칸의 차이로 미분하고 CPU는 수식으로 미분하므로, 짧은 파도일수록 조금씩 다르다.
     expect(relativeError(gpu, cpu)).toBeLessThan(0.1);
   });
+
+  it('풍향이 정확히 동서남북이어도 모든 층의 변위와 기울기가 유한한 값이다', () => {
+    // 실제 게임에서 수면이 깨졌던 조건(풍랑 약 2.2m, 첨두 주파수 약 3.5, 바람이 남쪽으로)을 중심으로,
+    // 네 방향과 여러 시각을 모두 검사한다. 하나라도 NaN이나 무한대가 나오면 그 층 전체가 깨져 보인다.
+    const windDirections = [0, 90, 180, 270];
+    const times = [0, 7.3, 61.8, 250.5];
+    const broken: string[] = [];
+    for (const windTowardDeg of windDirections) {
+      shapeSea(2.2, 3.5, windTowardDeg, 1.8, 130);
+      for (const time of times) {
+        sea.update(time);
+        sea.cascades.forEach((cascade, layer) => {
+          for (const [name, target] of [
+            ['변위', cascade.displacementTarget],
+            ['기울기', cascade.gradientTarget],
+          ] as const) {
+            const pixels = readTarget(target);
+            let count = 0;
+            let first = -1;
+            for (let i = 0; i < pixels.length; i++) {
+              if (!Number.isFinite(pixels[i])) {
+                count++;
+                if (first < 0) first = i;
+              }
+            }
+            if (count > 0) {
+              const cell = Math.floor(first / 4);
+              broken.push(
+                `풍향 ${windTowardDeg}°, 시각 ${time}s, ${layer}층 ${name}: 유한하지 않은 값 ${count}개 ` +
+                  `(처음은 행 ${Math.floor(cell / GRID_SIZE)}, 열 ${cell % GRID_SIZE}, 채널 ${first % 4}, 값 ${pixels[first]})`,
+              );
+            }
+          }
+        });
+      }
+    }
+
+    expect(broken).toEqual([]);
+  });
 });

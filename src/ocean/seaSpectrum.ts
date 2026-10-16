@@ -76,7 +76,8 @@ export const SEA_SHAPE: SeaShape = {
  */
 function amplitude(kx: number, kz: number, tileSize: number, shape: SeaShape, withSwell: boolean): number {
   const k = Math.hypot(kx, kz);
-  const along = (kx * shape.windX + kz * shape.windZ) / k;
+  // GLSL과 같은 범위로 자른다. 수학적으로는 -1~1이지만, 셰이더의 32비트 계산에서는 반올림 때문에 벗어날 수 있다.
+  const along = Math.min(Math.max((kx * shape.windX + kz * shape.windZ) / k, -1), 1);
   let energy = (shape.windEnergy * directionalWeight(along) * Math.exp(-1.25 * (shape.peak / k) ** 2)) / k ** 4;
   if (withSwell) {
     const distance = (kx - shape.swellX) ** 2 + (kz - shape.swellZ) ** 2;
@@ -96,7 +97,9 @@ export const AMPLITUDE_GLSL = /* glsl */ `
   uniform float uSwellSpread;
 
   float amplitude(vec2 k, float kLength, float tileSize) {
-    float along = dot(k / kLength, uWindDirection);
+    // 풍향이 정확히 축 방향이면 바람과 정반대인 파도에서 반올림 때문에 -1보다 조금 작아진다.
+    // 그러면 비중이 음수가 되어 sqrt가 NaN을 내고, 푸리에 변환을 거치며 층 전체로 퍼진다.
+    float along = clamp(dot(k / kLength, uWindDirection), -1.0, 1.0);
     float directional = along > 0.0
       ? ${CROSS_WIND_SHARE} + ${1 - CROSS_WIND_SHARE} * along * along * along * along
       : ${CROSS_WIND_SHARE} * (1.0 + along);
