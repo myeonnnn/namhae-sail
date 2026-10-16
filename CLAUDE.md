@@ -6,7 +6,8 @@
 ## 명령
 
 ```bash
-pnpm dev          # 개발 서버, 포트 5190 고정. 상위 폴더 .claude/launch.json의 namhae-sail로 띄운다
+pnpm dev:http     # 인증서 없는 HTTP 개발 서버, 포트 5192. 컨트롤러를 쓰지 않을 때는 이것을 .claude/launch.json의 namhae-sail-http로 띄운다
+pnpm dev          # HTTPS 개발 서버, 포트 5190. 핸드폰 컨트롤러(기울기 센서)를 시험할 때만 쓴다. launch.json의 namhae-sail
 pnpm dev:lan      # 같은 와이파이의 핸드폰으로 컨트롤러를 시험할 때만 쓴다. 개발 서버를 LAN에 연다
 pnpm typecheck
 pnpm test         # 단위, 통합, 브라우저 테스트를 모두 실행

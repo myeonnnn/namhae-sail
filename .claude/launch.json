@@ -2,6 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "namhae-sail-http",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:http"],
+      "port": 5192,
+      "url": "http://localhost:5192"
+    },
+    {
       "name": "namhae-sail",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],

@@ -1,19 +1,21 @@
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig, type Plugin } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // 개발 서버는 기본으로 이 PC에서만 열어서, 같은 와이파이의 다른 기기가 소스에 접근하지 못하게 한다.
   // 핸드폰 컨트롤러를 시험할 때만 pnpm dev:lan으로 LAN에 연다.
-  server: { port: 5190, strictPort: true },
+  // http 모드(pnpm dev:http)는 HTTPS를 쓰는 서버와 함께 띄울 수 있도록 포트를 따로 쓴다.
+  server: mode === 'http' ? { port: 5192, strictPort: true } : { port: 5190, strictPort: true },
   // 아이폰은 HTTPS 페이지에서만 기울기 센서를 허용하므로, 개발 서버도 자체 서명 인증서로 HTTPS를 쓴다.
-  plugins: [basicSsl(), lanUrl()],
+  // 컨트롤러를 쓰지 않을 때는 인증서 경고 없이 열리도록 http 모드에서 HTTPS를 끈다.
+  plugins: mode === 'http' ? [lanUrl()] : [basicSsl(), lanUrl()],
   build: {
     // 컨트롤러는 핸드폰에서 따로 여는 페이지이므로, 배포에도 게임과 함께 포함한다.
     rollupOptions: {
       input: { main: 'index.html', controller: 'controller.html' },
     },
   },
-});
+}));
 
 /**
  * 개발 서버의 LAN 주소를 /__lan-url로 알려 준다.
